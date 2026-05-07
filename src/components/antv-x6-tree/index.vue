@@ -36,11 +36,11 @@ let loadedNodeIds = new Set<string>();
 const NODE_WIDTH = 80;
 const NODE_HEIGHT = 100;
 const ROOT_GAP_Y = 120;
-const TIMELINE_GAP_X = 90;
-const TIMELINE_ROW_GAP_Y = 120;
-const LAZY_BUFFER = 200;
+const TIMELINE_GAP_X = 140;
+const TIMELINE_ROW_GAP_Y = 180;
+const LAZY_BUFFER = 30;
 
-const PLACEHOLDER_IMAGE = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+const PLACEHOLDER_IMAGE = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEgAAAAoCAYAAABdGbwdAAAAkklEQVR4AezSQQqAMBAEwSX//7P+YPsiIlK5NoRQmXM5q8AZZxUAtPLMAAIUApEtCFAIRLYgQCEQ2YIAhUBkCwIUApEt6HGguPBv2YLiRwEBCoHIFgQoBCJbEKAQiGxBgEIgsgUBCoHIFgQoBCK/saB4wrczoPgfQIBCILIFAQqByBYEKAQiWxCgEIhsQYBCIPINAAD//0wL2+UAAAAGSURBVAMAnD4fQNSHsuYAAAAASUVORK5CYII=";
 
 function createDagreLayout() {
   return new AntVDagreLayout({
@@ -343,11 +343,11 @@ function updateVisibleImages() {
   const tx = translation.tx;
   const ty = translation.ty;
 
-  const viewLeft = -tx / scale - LAZY_BUFFER;
-  const viewTop = -ty / scale - LAZY_BUFFER;
-  const viewRight = (-tx + containerWidth) / scale + LAZY_BUFFER;
-  const viewBottom = (-ty + containerHeight) / scale + LAZY_BUFFER;
-
+  const buffer = LAZY_BUFFER / scale;
+  const viewLeft = -tx / scale - buffer;
+  const viewTop = -ty / scale - buffer;
+  const viewRight = (-tx + containerWidth) / scale + buffer;
+  const viewBottom = (-ty + containerHeight) / scale + buffer;
   const cells = graph.getCells();
   cells.forEach((cell) => {
     if (!cell.isNode()) return;
@@ -637,7 +637,7 @@ const loadData = async () => {
     if (treeRoot) {
       locateNode(`label-${treeRoot.rootId}`);
     }
-    setTimeout(() => updateVisibleImages(), 100);
+    setTimeout(() => updateVisibleImages(), 500);
     return;
   }
 
@@ -685,7 +685,7 @@ const loadData = async () => {
       graph.centerCell(cell);
     }
   }
-  setTimeout(() => updateVisibleImages(), 100);
+  setTimeout(() => updateVisibleImages(), 500);
 };
 
 onMounted(() => {
