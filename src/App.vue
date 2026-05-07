@@ -77,6 +77,15 @@ const compareTimelineNodes = ref<Node[]>([])
 const comparePage = ref(0)
 const compareTreeIndex = ref(0)
 
+interface CompareFrame {
+  parent: TreeNode
+  children: TreeNode[]
+  position: string
+}
+const compareTreeFrames = ref<CompareFrame[]>([])
+const compareFrameIndex = ref(0)
+const compareChildPage = ref(0)
+
 function collectTreeNodesFlat(node: TreeNode, list: Node[]): void {
   list.push({
     id: node.selfId,
@@ -117,25 +126,146 @@ function nextCompareGroup() {
   }
 }
 
+function findTreeNodeById(root: TreeNode, id: string): TreeNode | null {
+  if (root.selfId === id) return root
+  if (root.children) {
+    for (const child of root.children) {
+      const found = findTreeNodeById(child, id)
+      if (found) return found
+    }
+  }
+  return null
+}
+
+function buildPositionMap(root: TreeNode): Map<TreeNode, string> {
+  const map = new Map<TreeNode, string>()
+  const queue: { node: TreeNode; depth: number; indexInLevel: number }[] = []
+  let levelCounter = new Map<number, number>()
+  queue.push({ node: root, depth: 1, indexInLevel: 0 })
+  while (queue.length > 0) {
+    const { node, depth } = queue.shift()!
+    const count = (levelCounter.get(depth) || 0) + 1
+    levelCounter.set(depth, count)
+    map.set(node, `${depth}.${count}`)
+    if (node.children) {
+      node.children.forEach((child) => {
+        queue.push({ node: child, depth: depth + 1, indexInLevel: 0 })
+      })
+    }
+  }
+  return map
+}
+
+function buildTreeCompareFrames(startNode: TreeNode, treeRoot: TreeRoot): CompareFrame[] {
+  const positionMap = buildPositionMap(treeRoot.tree)
+  const frames: CompareFrame[] = []
+  const queue: TreeNode[] = [startNode]
+  while (queue.length > 0) {
+    const node = queue.shift()!
+    frames.push({
+      parent: node,
+      children: node.children ? [...node.children] : [],
+      position: positionMap.get(node) || '?',
+    })
+    if (node.children) {
+      node.children.forEach((child) => queue.push(child))
+    }
+  }
+  return frames
+}
+
 const maxComparePage = computed(() => Math.max(1, Math.ceil(compareTimelineNodes.value.length / 3)))
 const isCompareFirstPage = computed(() => comparePage.value === 0)
 const isCompareLastPage = computed(() => comparePage.value >= maxComparePage.value - 1)
 const hasPrevCompareTrees = computed(() => compareTreeIndex.value > 0)
 const hasMoreCompareTrees = computed(() => compareTreeIndex.value < allTrees.value.length - 1)
 
+const currentFrame = computed(() => compareTreeFrames.value[compareFrameIndex.value] || null)
+const maxChildPage = computed(() => {
+  if (!currentFrame.value) return 1
+  return Math.max(1, Math.ceil(currentFrame.value.children.length / 3))
+})
+const isLastChildPage = computed(() => compareChildPage.value >= maxChildPage.value - 1)
+const isLastFrame = computed(() => compareFrameIndex.value >= compareTreeFrames.value.length - 1)
+const isFirstChildPage = computed(() => compareChildPage.value === 0)
+const isFirstFrame = computed(() => compareFrameIndex.value === 0)
+
+function treeNextPage() {
+  if (!isLastChildPage.value) {
+    compareChildPage.value++
+  } else if (!isLastFrame.value) {
+    goNextFrame()
+  } else if (hasMoreCompareTrees.value) {
+    nextCompareTree()
+  }
+}
+
+function treePrevPage() {
+  if (!isFirstChildPage.value) {
+    compareChildPage.value--
+  } else if (!isFirstFrame.value) {
+    goPrevFrame()
+  } else if (hasPrevCompareTrees.value) {
+    prevCompareTree()
+  }
+}
+
+function goNextFrame() {
+  if (compareFrameIndex.value < compareTreeFrames.value.length - 1) {
+    compareFrameIndex.value++
+    compareChildPage.value = 0
+  }
+}
+
+function goPrevFrame() {
+  if (compareFrameIndex.value > 0) {
+    compareFrameIndex.value--
+    const prevFrame = compareTreeFrames.value[compareFrameIndex.value]
+    compareChildPage.value = Math.max(0, Math.ceil(prevFrame.children.length / 3) - 1)
+  }
+}
+
+function nextCompareTree() {
+  if (compareTreeIndex.value < allTrees.value.length - 1) {
+    const nextIdx = compareTreeIndex.value + 1
+    compareTreeIndex.value = nextIdx
+    const tree = allTrees.value[nextIdx]
+    compareTreeFrames.value = buildTreeCompareFrames(tree.tree, tree)
+    compareFrameIndex.value = 0
+    compareChildPage.value = 0
+  }
+}
+
+function prevCompareTree() {
+  if (compareTreeIndex.value > 0) {
+    const prevIdx = compareTreeIndex.value - 1
+    compareTreeIndex.value = prevIdx
+    const tree = allTrees.value[prevIdx]
+    compareTreeFrames.value = buildTreeCompareFrames(tree.tree, tree)
+    compareFrameIndex.value = compareTreeFrames.value.length - 1
+    const lastFrame = compareTreeFrames.value[compareFrameIndex.value]
+    compareChildPage.value = Math.max(0, Math.ceil(lastFrame.children.length / 3) - 1)
+  }
+}
+
 function handleCompareKeydown(e: KeyboardEvent) {
-  if (e.key === 'ArrowLeft' || e.key === 'Left') {
-    if (comparePage.value > 0) {
-      comparePage.value--
-    } else if (hasPrevCompareTrees.value) {
-      prevCompareGroup()
+  if (viewMode.value === 'timeline') {
+    if (e.key === 'ArrowLeft' || e.key === 'Left') {
+      if (comparePage.value > 0) {
+        comparePage.value--
+      } else if (hasPrevCompareTrees.value) {
+        prevCompareGroup()
+      }
+    } else if (e.key === 'ArrowRight' || e.key === 'Right') {
+      if (comparePage.value < maxComparePage.value - 1) {
+        comparePage.value++
+      } else if (hasMoreCompareTrees.value) {
+        nextCompareGroup()
+      }
     }
-  } else if (e.key === 'ArrowRight' || e.key === 'Right') {
-    if (comparePage.value < maxComparePage.value - 1) {
-      comparePage.value++
-    } else if (hasMoreCompareTrees.value) {
-      nextCompareGroup()
-    }
+  } else {
+    if (e.key === 'ArrowLeft' || e.key === 'Left') treePrevPage()
+    else if (e.key === 'ArrowRight' || e.key === 'Right') treeNextPage()
   }
 }
 
@@ -155,8 +285,26 @@ const handleNodeDoubleClick = (node: Node) => {
     return found
   })
   if (idx === -1) return
-  loadCompareTree(idx)
+  compareTreeIndex.value = idx
+
+  if (viewMode.value === 'timeline') {
+    loadCompareTree(idx)
+  } else {
+    const tree = allTrees.value[idx]
+    const startNode = findTreeNodeById(tree.tree, node.id)
+    if (!startNode) return
+    compareTreeFrames.value = buildTreeCompareFrames(startNode, tree)
+    compareFrameIndex.value = 0
+    compareChildPage.value = 0
+  }
   compareVisible.value = true
+}
+
+function onCompareClosed() {
+  compareTimelineNodes.value = []
+  compareTreeFrames.value = []
+  compareFrameIndex.value = 0
+  compareChildPage.value = 0
 }
 
 const handleUpdateParent = (nodeId: string, newParentId: string) => {
@@ -250,76 +398,166 @@ onMounted(async () => {
 
     <el-dialog
       v-model="compareVisible"
-      title="比对"
+      :title="viewMode === 'timeline' ? '时间轴比对' : '树形比对'"
       fullscreen
       append-to-body
-      @closed="compareTimelineNodes = []"
+      @closed="onCompareClosed"
       @keydown="handleCompareKeydown"
     >
-      <div class="compare-body">
-        <div class="compare-grid">
-          <div class="compare-cell">
-            <el-image :src="compareRootImage" fit="contain" class="compare-image">
-              <template #placeholder>
-                <div class="compare-image-loading">
-                  <div class="loading-spinner"></div>
-                </div>
-              </template>
-            </el-image>
-            <div class="compare-label">{{ compareRootLabel }}</div>
-          </div>
-          <div v-for="i in 3" :key="i" class="compare-cell">
-            <template v-if="compareTimelineNodes[comparePage * 3 + i - 1]">
-              <el-image
-                :src="compareTimelineNodes[comparePage * 3 + i - 1].imageUrl"
-                fit="contain"
-                class="compare-image"
-              >
+      <template v-if="viewMode === 'tree' && currentFrame">
+        <div class="compare-body">
+          <div class="compare-grid">
+            <div class="compare-cell">
+              <el-image :src="currentFrame.parent.selfUrl" fit="contain" class="compare-image">
                 <template #placeholder>
                   <div class="compare-image-loading">
                     <div class="loading-spinner"></div>
                   </div>
                 </template>
               </el-image>
-              <div class="compare-label">
-                {{ compareTimelineNodes[comparePage * 3 + i - 1].selfId }}
-                {{ compareTimelineNodes[comparePage * 3 + i - 1].matchDate }}
-              </div>
-            </template>
-            <div v-else class="compare-placeholder"></div>
+              <div class="compare-label">{{ currentFrame.parent.selfId }} | {{ currentFrame.position }}层</div>
+            </div>
+            <div v-for="i in 3" :key="i" class="compare-cell">
+              <template v-if="currentFrame.children[compareChildPage * 3 + i - 1]">
+                <el-image
+                  :src="currentFrame.children[compareChildPage * 3 + i - 1].selfUrl"
+                  fit="contain"
+                  class="compare-image"
+                >
+                  <template #placeholder>
+                    <div class="compare-image-loading">
+                      <div class="loading-spinner"></div>
+                    </div>
+                  </template>
+                </el-image>
+                <div class="compare-label">
+                  {{ currentFrame.children[compareChildPage * 3 + i - 1].selfId }}
+                  {{ currentFrame.children[compareChildPage * 3 + i - 1].matchDate }}
+                </div>
+              </template>
+              <div v-else class="compare-placeholder"></div>
+            </div>
+          </div>
+          <div class="compare-controls">
+            <el-button
+              v-if="isFirstChildPage && isFirstFrame && hasPrevCompareTrees"
+              type="primary"
+              size="small"
+              @click="prevCompareTree"
+            >
+              上一颗树
+            </el-button>
+            <el-button
+              v-else-if="isFirstChildPage && !isFirstFrame"
+              size="small"
+              @click="goPrevFrame"
+            >
+              上一帧
+            </el-button>
+            <el-button
+              v-else
+              size="small"
+              :disabled="isFirstChildPage"
+              @click="compareChildPage--"
+            >
+              上一页
+            </el-button>
+            <span class="compare-page-info">
+              帧 {{ compareFrameIndex + 1 }}/{{ compareTreeFrames.length }}
+              · 页 {{ compareChildPage + 1 }}/{{ maxChildPage }}
+            </span>
+            <el-button
+              v-if="isLastChildPage && isLastFrame && hasMoreCompareTrees"
+              type="primary"
+              size="small"
+              @click="nextCompareTree"
+            >
+              下一颗树
+            </el-button>
+            <el-button
+              v-else-if="isLastChildPage && !isLastFrame"
+              size="small"
+              @click="goNextFrame"
+            >
+              下一帧
+            </el-button>
+            <el-button
+              v-else
+              size="small"
+              :disabled="isLastChildPage"
+              @click="compareChildPage++"
+            >
+              下一页
+            </el-button>
           </div>
         </div>
-        <div class="compare-controls">
-          <el-button
-            v-if="isCompareFirstPage && hasPrevCompareTrees"
-            type="primary"
-            size="small"
-            @click="prevCompareGroup"
-          >
-            上一组
-          </el-button>
-          <el-button v-else size="small" :disabled="comparePage === 0" @click="comparePage--">
-            上一页
-          </el-button>
-          <span class="compare-page-info">{{ comparePage + 1 }} / {{ maxComparePage }}</span>
-          <el-button
-            v-if="isCompareLastPage && hasMoreCompareTrees"
-            type="primary"
-            size="small"
-            @click="nextCompareGroup"
-          >
-            下一组
-          </el-button>
-          <el-button
-            v-else
-            size="small"
-            :disabled="comparePage >= maxComparePage - 1"
-            @click="comparePage++"
-          >
-            下一页
-          </el-button>
+      </template>
+      <template v-else>
+        <div class="compare-body">
+          <div class="compare-grid">
+            <div class="compare-cell">
+              <el-image :src="compareRootImage" fit="contain" class="compare-image">
+                <template #placeholder>
+                  <div class="compare-image-loading">
+                    <div class="loading-spinner"></div>
+                  </div>
+                </template>
+              </el-image>
+              <div class="compare-label">{{ compareRootLabel }}</div>
+            </div>
+            <div v-for="i in 3" :key="i" class="compare-cell">
+              <template v-if="compareTimelineNodes[comparePage * 3 + i - 1]">
+                <el-image
+                  :src="compareTimelineNodes[comparePage * 3 + i - 1]?.imageUrl"
+                  fit="contain"
+                  class="compare-image"
+                >
+                  <template #placeholder>
+                    <div class="compare-image-loading">
+                      <div class="loading-spinner"></div>
+                    </div>
+                  </template>
+                </el-image>
+                <div class="compare-label">
+                  {{ compareTimelineNodes[comparePage * 3 + i - 1]?.selfId }}
+                  {{ compareTimelineNodes[comparePage * 3 + i - 1]?.matchDate }}
+                </div>
+              </template>
+              <div v-else class="compare-placeholder"></div>
+            </div>
+          </div>
+          <div class="compare-controls">
+            <el-button
+              v-if="isCompareFirstPage && hasPrevCompareTrees"
+              type="primary"
+              size="small"
+              @click="prevCompareGroup"
+            >
+              上一组
+            </el-button>
+            <el-button v-else size="small" :disabled="comparePage === 0" @click="comparePage--">
+              上一页
+            </el-button>
+            <span class="compare-page-info">{{ comparePage + 1 }} / {{ maxComparePage }}</span>
+            <el-button
+              v-if="isCompareLastPage && hasMoreCompareTrees"
+              type="primary"
+              size="small"
+              @click="nextCompareGroup"
+            >
+              下一组
+            </el-button>
+            <el-button
+              v-else
+              size="small"
+              :disabled="comparePage >= maxComparePage - 1"
+              @click="comparePage++"
+            >
+              下一页
+            </el-button>
+          </div>
         </div>
-      </div>
+      </template>
     </el-dialog>
   </div>
 </template>

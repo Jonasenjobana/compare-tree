@@ -627,7 +627,7 @@ const loadData = async () => {
       ? props.trees.find((t) => {
           let found = false;
           function walk(node: any) {
-            if (node.selfId === focusNode.id) found = true;
+            if (node.selfId === focusNode!.id) found = true;
             if (node.children) node.children.forEach((c: any) => walk(c));
           }
           walk(t.tree);
