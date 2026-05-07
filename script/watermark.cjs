@@ -1,0 +1,1 @@
+const r=['GoJS 3.1 evaluation','(c) 1998-2026 Northwoods Software','Not for distribution or production use','gojs.net','licenseKey'];return r.includes(o)?'':o;
