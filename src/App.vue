@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Search, SortUp, SortDown } from '@element-plus/icons-vue'
 import PreviewPanel from '@/components/preview-panel/index.vue'
@@ -12,8 +12,10 @@ import type { Node } from '@/types'
 
 const {
   allTrees, nodes, viewMode, timelineOrder,
-  searchKeyword, selectedTreeId, filteredTrees,
-  changeSelectedTree, loadTreeData,
+  searchKeyword, selectedTreeId, displayMode, pagedTreeIndex,
+  filteredTrees, hasPrevTree, hasNextTree,
+  changeSelectedTree, onDisplayModeChange,
+  goToPrevTree, goToNextTree, loadTreeData, refreshNodes,
 } = useTreeData()
 
 const {
@@ -27,9 +29,11 @@ const {
   prevCompareGroup, nextCompareGroup,
   goPrevFrame, goNextFrame, prevCompareTree, nextCompareTree,
   handleCompareKeydown, onCompareClosed, openCompareForNode,
+  gridMode, childPageSize,
 } = useCompareDialog(allTrees, viewMode)
 
 const goJsTreeRef = ref<any>(null)
+const treeListRef = ref<HTMLDivElement | null>(null)
 const focusNodeId = ref('')
 const selectedNode = ref<Node | null>(null)
 
@@ -88,8 +92,53 @@ async function handleSubmitReview(records: { selfId: string; reviewResult: strin
   }
 }
 
+function handleGlobalKeydown(e: KeyboardEvent) {
+  if (compareVisible.value) return
+  if (displayMode.value !== 'paged') return
+  if (e.key === 'ArrowLeft') goToPrevTree()
+  else if (e.key === 'ArrowRight') goToNextTree()
+}
+
+function scrollTreeListToActive() {
+  nextTick(() => {
+    if (!treeListRef.value) return
+    const activeItem = treeListRef.value.querySelector('.tree-item.active')
+    if (activeItem) {
+      activeItem.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    }
+  })
+}
+
+watch(selectedTreeId, () => {
+  scrollTreeListToActive()
+})
+
+watch(compareTreeIndex, (newIdx) => {
+  if (!compareVisible.value) return
+  const tree = allTrees.value[newIdx]
+  if (!tree) return
+  const rootId = tree.rootId
+  if (displayMode.value === 'paged') {
+    const idx = filteredTrees.value.findIndex((t) => t.rootId === rootId)
+    if (idx !== -1) {
+      pagedTreeIndex.value = idx
+      selectedTreeId.value = rootId
+      refreshNodes()
+    }
+  } else {
+    selectedTreeId.value = rootId
+    focusNodeId.value = rootId
+  }
+  locateToRoot(rootId)
+})
+
 onMounted(() => {
   loadTreeData()
+  window.addEventListener('keydown', handleGlobalKeydown)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handleGlobalKeydown)
 })
 </script>
 
@@ -106,6 +155,15 @@ onMounted(() => {
         @node-select="handleNodeSelect"
         @node-double-click="handleNodeDoubleClick"
       />
+      <div v-if="displayMode === 'paged'" class="paged-controls">
+        <el-button size="small" :disabled="!hasPrevTree" @click="goToPrevTree">
+          上一颗树
+        </el-button>
+        <span class="paged-info">{{ pagedTreeIndex + 1 }} / {{ filteredTrees.length }}</span>
+        <el-button size="small" :disabled="!hasNextTree" @click="goToNextTree">
+          下一颗树
+        </el-button>
+      </div>
     </div>
     <div class="preview-area">
       <div class="tree-filter-section">
@@ -113,6 +171,12 @@ onMounted(() => {
           <el-radio-group v-model="viewMode" size="small">
             <el-radio-button value="tree">树形</el-radio-button>
             <el-radio-button value="timeline">时间轴</el-radio-button>
+          </el-radio-group>
+        </div>
+        <div class="view-mode-row">
+          <el-radio-group v-model="displayMode" size="small" @change="onDisplayModeChange">
+            <el-radio-button value="global">全局</el-radio-button>
+            <el-radio-button value="paged">分页</el-radio-button>
           </el-radio-group>
           <el-button
             v-if="viewMode === 'timeline'"
@@ -133,7 +197,7 @@ onMounted(() => {
             <el-icon><Search /></el-icon>
           </template>
         </el-input>
-        <div class="tree-list">
+        <div ref="treeListRef" class="tree-list">
           <div
             v-for="tree in filteredTrees"
             :key="tree.rootId"
@@ -160,6 +224,7 @@ onMounted(() => {
     <CompareDialog
       v-model="compareVisible"
       :view-mode="viewMode"
+      :grid-mode="gridMode"
       :compare-root-image="compareRootImage"
       :compare-root-label="compareRootLabel"
       :compare-timeline-nodes="compareTimelineNodes"
@@ -178,8 +243,10 @@ onMounted(() => {
       :is-last-frame="isLastFrame"
       :has-prev-compare-trees="hasPrevCompareTrees"
       :has-more-compare-trees="hasMoreCompareTrees"
+      :child-page-size="childPageSize"
       @update:compare-page="comparePage = $event"
       @update:compare-child-page="compareChildPage = $event"
+      @update:grid-mode="gridMode = $event"
       @prev-compare-group="prevCompareGroup"
       @next-compare-group="nextCompareGroup"
       @go-prev-frame="goPrevFrame"
@@ -204,6 +271,7 @@ onMounted(() => {
 .canvas-area {
   flex: 0 0 85%;
   height: 100%;
+  position: relative;
 }
 
 .preview-area {
@@ -255,5 +323,27 @@ onMounted(() => {
   font-size: 13px;
   color: #333;
   word-break: break-all;
+}
+
+.paged-controls {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 20px;
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 20px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+  z-index: 10;
+}
+
+.paged-info {
+  font-size: 14px;
+  color: #606266;
+  min-width: 60px;
+  text-align: center;
 }
 </style>

@@ -1,4 +1,4 @@
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { Node, TreeNode, TreeRoot } from '@/types'
 import { findTreeNodeById, buildTreeCompareFrames, type CompareFrame } from '@/utils/tree-utils'
@@ -19,6 +19,14 @@ export function useCompareDialog(
   const compareTreeFrames = ref<CompareFrame[]>([])
   const compareFrameIndex = ref(0)
   const compareChildPage = ref(0)
+
+  const gridMode = ref<'2' | '4'>('4')
+  const childPageSize = computed(() => gridMode.value === '2' ? 1 : 3)
+
+  watch(gridMode, () => {
+    compareChildPage.value = 0
+    comparePage.value = 0
+  })
 
   function collectTreeNodesFlat(node: TreeNode, list: Node[]): void {
     list.push({
@@ -60,7 +68,7 @@ export function useCompareDialog(
     }
   }
 
-  const maxComparePage = computed(() => Math.max(1, Math.ceil(compareTimelineNodes.value.length / 3)))
+  const maxComparePage = computed(() => Math.max(1, Math.ceil(compareTimelineNodes.value.length / childPageSize.value)))
   const isCompareFirstPage = computed(() => comparePage.value === 0)
   const isCompareLastPage = computed(() => comparePage.value >= maxComparePage.value - 1)
   const hasPrevCompareTrees = computed(() => compareTreeIndex.value > 0)
@@ -69,7 +77,7 @@ export function useCompareDialog(
   const currentFrame = computed(() => compareTreeFrames.value[compareFrameIndex.value] || null)
   const maxChildPage = computed(() => {
     if (!currentFrame.value) return 1
-    return Math.max(1, Math.ceil(currentFrame.value.children.length / 3))
+    return Math.max(1, Math.ceil(currentFrame.value.children.length / childPageSize.value))
   })
   const isLastChildPage = computed(() => compareChildPage.value >= maxChildPage.value - 1)
   const isLastFrame = computed(() => compareFrameIndex.value >= compareTreeFrames.value.length - 1)
@@ -106,8 +114,8 @@ export function useCompareDialog(
   function goPrevFrame() {
     if (compareFrameIndex.value > 0) {
       compareFrameIndex.value--
-      const prevFrame = compareTreeFrames.value[compareFrameIndex.value]
-      compareChildPage.value = Math.max(0, Math.ceil(prevFrame.children.length / 3) - 1)
+      const prevFrame = compareTreeFrames.value[compareFrameIndex.value]!
+      compareChildPage.value = Math.max(0, Math.ceil(prevFrame.children.length / childPageSize.value) - 1)
     }
   }
 
@@ -115,7 +123,7 @@ export function useCompareDialog(
     if (compareTreeIndex.value < allTrees.value.length - 1) {
       const nextIdx = compareTreeIndex.value + 1
       compareTreeIndex.value = nextIdx
-      const tree = allTrees.value[nextIdx]
+      const tree = allTrees.value[nextIdx]!
       compareTreeFrames.value = buildTreeCompareFrames(tree.tree, tree)
       compareFrameIndex.value = 0
       compareChildPage.value = 0
@@ -126,11 +134,11 @@ export function useCompareDialog(
     if (compareTreeIndex.value > 0) {
       const prevIdx = compareTreeIndex.value - 1
       compareTreeIndex.value = prevIdx
-      const tree = allTrees.value[prevIdx]
+      const tree = allTrees.value[prevIdx]!
       compareTreeFrames.value = buildTreeCompareFrames(tree.tree, tree)
       compareFrameIndex.value = compareTreeFrames.value.length - 1
-      const lastFrame = compareTreeFrames.value[compareFrameIndex.value]
-      compareChildPage.value = Math.max(0, Math.ceil(lastFrame.children.length / 3) - 1)
+      const lastFrame = compareTreeFrames.value[compareFrameIndex.value]!
+      compareChildPage.value = Math.max(0, Math.ceil(lastFrame.children.length / childPageSize.value) - 1)
     }
   }
 
@@ -178,7 +186,7 @@ export function useCompareDialog(
     if (viewMode.value === 'timeline') {
       loadCompareTree(idx)
     } else {
-      const tree = allTrees.value[idx]
+      const tree = allTrees.value[idx]!
       const startNode = findTreeNodeById(tree.tree, node.id)
       if (!startNode) return
       compareTreeFrames.value = buildTreeCompareFrames(startNode, tree)
@@ -218,5 +226,7 @@ export function useCompareDialog(
     handleCompareKeydown,
     onCompareClosed,
     openCompareForNode,
+    gridMode,
+    childPageSize,
   }
 }

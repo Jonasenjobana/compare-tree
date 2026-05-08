@@ -32,6 +32,8 @@ let graph: Graph | null = null;
 const currentScale = ref(1);
 let loadDataVersion = 0;
 let loadedNodeIds = new Set<string>();
+let contentBounds = { x: 0, y: 0, width: 0, height: 0 };
+let isClamping = false;
 
 const NODE_WIDTH = 80;
 const NODE_HEIGHT = 100;
@@ -376,6 +378,55 @@ function updateVisibleImages() {
   });
 }
 
+function updateContentBounds() {
+  if (!graph) return;
+  const area = graph.getContentArea();
+  if (area && area.width > 0 && area.height > 0) {
+    contentBounds = { x: area.x, y: area.y, width: area.width, height: area.height };
+  }
+}
+
+function clampTranslation() {
+  if (!graph || !containerRef.value || isClamping) return;
+  if (contentBounds.width === 0 || contentBounds.height === 0) return;
+
+  const containerWidth = containerRef.value.clientWidth;
+  const containerHeight = containerRef.value.clientHeight;
+  const scale = graph.zoom();
+  const translation = graph.translate();
+
+  const contentW = contentBounds.width * scale;
+  const contentH = contentBounds.height * scale;
+
+  const padding = 40;
+  let tx = translation.tx;
+  let ty = translation.ty;
+
+  if (contentW + padding * 2 <= containerWidth) {
+    const targetX = (containerWidth - contentW) / 2 - contentBounds.x * scale;
+    tx = targetX;
+  } else {
+    const maxTx = padding - contentBounds.x * scale;
+    const minTx = containerWidth - padding - (contentBounds.x + contentBounds.width) * scale;
+    tx = Math.max(minTx, Math.min(maxTx, tx));
+  }
+
+  if (contentH + padding * 2 <= containerHeight) {
+    const targetY = (containerHeight - contentH) / 2 - contentBounds.y * scale;
+    ty = targetY;
+  } else {
+    const maxTy = padding - contentBounds.y * scale;
+    const minTy = containerHeight - padding - (contentBounds.y + contentBounds.height) * scale;
+    ty = Math.max(minTy, Math.min(maxTy, ty));
+  }
+
+  if (tx !== translation.tx || ty !== translation.ty) {
+    isClamping = true;
+    graph.translate(tx, ty);
+    isClamping = false;
+  }
+}
+
 const initGraph = () => {
   if (!containerRef.value) return;
 
@@ -596,10 +647,12 @@ const initGraph = () => {
     currentScale.value = sx;
     emit("scaleChange", sx);
     updateVisibleImages();
+    clampTranslation();
   });
 
   graph.on("translate", () => {
     updateVisibleImages();
+    clampTranslation();
   });
 
   graph.on("blank:mousewheel", () => {
@@ -622,6 +675,7 @@ const loadData = async () => {
 
     if (version !== loadDataVersion) return;
     graph.fromJSON({ nodes: result.nodes, edges: result.edges });
+    updateContentBounds();
     graph.centerContent();
     const focusNode = props.focusNodeId
       ? props.nodes.find((n) => n.id === props.focusNodeId)
@@ -678,6 +732,7 @@ const loadData = async () => {
     currentOffsetY = result.maxY + shiftY + ROOT_GAP_Y;
   });
   graph.fromJSON({ nodes: allCellNodes, edges: allCellEdges });
+  updateContentBounds();
   const targetNodeId = props.focusNodeId || trees[0]?.[0]?.id;
   if (targetNodeId && props.focusNodeId) {
     locateNode(targetNodeId);
@@ -731,7 +786,7 @@ const locateNode = (nodeId: string) => {
       selection.reset(cell);
     }
     graph.centerCell(cell);
-    graph.scale(1.5);
+    graph.scale(1.1);
   }
 };
 

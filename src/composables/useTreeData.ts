@@ -10,6 +10,8 @@ export function useTreeData() {
   const timelineOrder = ref<'asc' | 'desc'>('asc')
   const searchKeyword = ref('')
   const selectedTreeId = ref('')
+  const displayMode = ref<'global' | 'paged'>('global')
+  const pagedTreeIndex = ref(0)
 
   function convertTreeNodeToList(node: TreeNode, list: Node[]) {
     const convertedNode: Node = {
@@ -51,11 +53,65 @@ export function useTreeData() {
     )
   })
 
-  function changeSelectedTree(rootId: string) {
-    selectedTreeId.value = rootId === selectedTreeId.value ? '' : rootId
-    const convertedNodes = convertTreeListToNodes(allTrees.value)
-    nodes.value = convertedNodes
+  function refreshNodes() {
+    nodes.value = convertTreeListToNodes(allTrees.value)
   }
+
+  function changeSelectedTree(rootId: string) {
+    if (displayMode.value === 'paged') {
+      const idx = filteredTrees.value.findIndex((t) => t.rootId === rootId)
+      if (idx !== -1) {
+        pagedTreeIndex.value = idx
+        selectedTreeId.value = rootId
+      }
+    } else {
+      selectedTreeId.value = rootId === selectedTreeId.value ? '' : rootId
+    }
+    refreshNodes()
+  }
+
+  function switchToPagedMode() {
+    displayMode.value = 'paged'
+    if (!selectedTreeId.value && filteredTrees.value.length > 0) {
+      pagedTreeIndex.value = 0
+      selectedTreeId.value = filteredTrees.value[0].rootId
+    } else if (selectedTreeId.value) {
+      const idx = filteredTrees.value.findIndex((t) => t.rootId === selectedTreeId.value)
+      if (idx !== -1) pagedTreeIndex.value = idx
+    }
+    refreshNodes()
+  }
+
+  function switchToGlobalMode() {
+    displayMode.value = 'global'
+    selectedTreeId.value = ''
+    pagedTreeIndex.value = 0
+    refreshNodes()
+  }
+
+  function onDisplayModeChange(val: 'global' | 'paged') {
+    if (val === 'paged') switchToPagedMode()
+    else switchToGlobalMode()
+  }
+
+  function goToPrevTree() {
+    if (pagedTreeIndex.value > 0) {
+      pagedTreeIndex.value--
+      selectedTreeId.value = filteredTrees.value[pagedTreeIndex.value].rootId
+      refreshNodes()
+    }
+  }
+
+  function goToNextTree() {
+    if (pagedTreeIndex.value < filteredTrees.value.length - 1) {
+      pagedTreeIndex.value++
+      selectedTreeId.value = filteredTrees.value[pagedTreeIndex.value].rootId
+      refreshNodes()
+    }
+  }
+
+  const hasPrevTree = computed(() => pagedTreeIndex.value > 0)
+  const hasNextTree = computed(() => pagedTreeIndex.value < filteredTrees.value.length - 1)
 
   async function loadTreeData() {
     try {
@@ -75,8 +131,16 @@ export function useTreeData() {
     timelineOrder,
     searchKeyword,
     selectedTreeId,
+    displayMode,
+    pagedTreeIndex,
     filteredTrees,
+    hasPrevTree,
+    hasNextTree,
     changeSelectedTree,
+    onDisplayModeChange,
+    goToPrevTree,
+    goToNextTree,
     loadTreeData,
+    refreshNodes,
   }
 }

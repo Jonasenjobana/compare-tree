@@ -6,6 +6,7 @@ import type { CompareFrame } from '@/utils/tree-utils'
 const props = defineProps<{
   modelValue: boolean
   viewMode: 'tree' | 'timeline'
+  gridMode: '2' | '4'
   compareRootImage: string
   compareRootLabel: string
   compareTimelineNodes: Node[]
@@ -24,12 +25,14 @@ const props = defineProps<{
   isLastFrame: boolean
   hasPrevCompareTrees: boolean
   hasMoreCompareTrees: boolean
+  childPageSize: number
 }>()
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
   'update:comparePage': [value: number]
   'update:compareChildPage': [value: number]
+  'update:gridMode': [value: '2' | '4']
   'prev-compare-group': []
   'next-compare-group': []
   'go-prev-frame': []
@@ -99,6 +102,8 @@ function clearReviewStates() {
 watch(() => props.modelValue, (val) => {
   if (!val) clearReviewStates()
 })
+
+const gridClass = computed(() => `compare-grid--${props.gridMode}`)
 </script>
 
 <template>
@@ -113,7 +118,7 @@ watch(() => props.modelValue, (val) => {
   >
     <template v-if="viewMode === 'tree' && currentFrame">
       <div class="compare-body">
-        <div class="compare-grid">
+        <div class="compare-grid" :class="gridClass">
           <div class="compare-cell">
             <div class="compare-image-wrapper">
               <el-image :src="currentFrame.parent.selfUrl" fit="contain" class="compare-image">
@@ -126,11 +131,11 @@ watch(() => props.modelValue, (val) => {
             </div>
             <div class="compare-label">{{ currentFrame.parent.selfId }} | {{ currentFrame.position }}层</div>
           </div>
-          <div v-for="i in 3" :key="i" class="compare-cell compare-cell--child">
-            <template v-if="currentFrame.children[compareChildPage * 3 + i - 1]">
+          <div v-for="i in childPageSize" :key="i" class="compare-cell compare-cell--child">
+            <template v-if="currentFrame.children[compareChildPage * childPageSize + i - 1]">
               <div class="compare-image-wrapper">
                 <el-image
-                  :src="currentFrame.children[compareChildPage * 3 + i - 1].selfUrl"
+                  :src="currentFrame.children[compareChildPage * childPageSize + i - 1]!.selfUrl"
                   fit="contain"
                   class="compare-image"
                 >
@@ -140,28 +145,33 @@ watch(() => props.modelValue, (val) => {
                     </div>
                   </template>
                 </el-image>
-                <div class="review-buttons">
+                <div class="review-buttons" :class="{ 'review-buttons--bottom': gridMode === '2' }">
                   <button
                     class="review-btn review-btn--pass"
-                    :class="{ active: getReviewState(compareChildPage * 3 + i - 1) === '一致' }"
-                    @click="setReviewState(compareChildPage * 3 + i - 1, '一致')"
+                    :class="{ active: getReviewState(compareChildPage * childPageSize + i - 1) === '一致' }"
+                    @click="setReviewState(compareChildPage * childPageSize + i - 1, '一致')"
                   >✔</button>
                   <button
                     class="review-btn review-btn--fail"
-                    :class="{ active: getReviewState(compareChildPage * 3 + i - 1) === '不一致' }"
-                    @click="setReviewState(compareChildPage * 3 + i - 1, '不一致')"
+                    :class="{ active: getReviewState(compareChildPage * childPageSize + i - 1) === '不一致' }"
+                    @click="setReviewState(compareChildPage * childPageSize + i - 1, '不一致')"
                   >✘</button>
                 </div>
               </div>
               <div class="compare-label">
-                {{ currentFrame.children[compareChildPage * 3 + i - 1].selfId }}
-                {{ currentFrame.children[compareChildPage * 3 + i - 1].matchDate }}
+                {{ currentFrame.children[compareChildPage * childPageSize + i - 1]!.selfId }}
+                {{ currentFrame.children[compareChildPage * childPageSize + i - 1]!.matchDate }}
               </div>
             </template>
             <div v-else class="compare-placeholder"></div>
           </div>
         </div>
         <div class="compare-controls">
+          <el-radio-group :model-value="gridMode" size="small" @update:model-value="emit('update:gridMode', $event as '2' | '4')">
+            <el-radio-button value="2">2宫格</el-radio-button>
+            <el-radio-button value="4">4宫格</el-radio-button>
+          </el-radio-group>
+          <div class="compare-controls-divider"></div>
           <el-button
             v-if="isFirstChildPage && isFirstFrame && hasPrevCompareTrees"
             type="primary"
@@ -226,7 +236,7 @@ watch(() => props.modelValue, (val) => {
     </template>
     <template v-else>
       <div class="compare-body">
-        <div class="compare-grid">
+        <div class="compare-grid" :class="gridClass">
           <div class="compare-cell">
             <div class="compare-image-wrapper">
               <el-image :src="compareRootImage" fit="contain" class="compare-image">
@@ -239,11 +249,11 @@ watch(() => props.modelValue, (val) => {
             </div>
             <div class="compare-label">{{ compareRootLabel }}</div>
           </div>
-          <div v-for="i in 3" :key="i" class="compare-cell">
-            <template v-if="compareTimelineNodes[comparePage * 3 + i - 1]">
+          <div v-for="i in childPageSize" :key="i" class="compare-cell">
+            <template v-if="compareTimelineNodes[comparePage * childPageSize + i - 1]">
               <div class="compare-image-wrapper">
                 <el-image
-                  :src="compareTimelineNodes[comparePage * 3 + i - 1]?.imageUrl"
+                  :src="compareTimelineNodes[comparePage * childPageSize + i - 1]?.imageUrl"
                   fit="contain"
                   class="compare-image"
                 >
@@ -255,14 +265,19 @@ watch(() => props.modelValue, (val) => {
                 </el-image>
               </div>
               <div class="compare-label">
-                {{ compareTimelineNodes[comparePage * 3 + i - 1]?.selfId }}
-                {{ compareTimelineNodes[comparePage * 3 + i - 1]?.matchDate }}
+                {{ compareTimelineNodes[comparePage * childPageSize + i - 1]?.selfId }}
+                {{ compareTimelineNodes[comparePage * childPageSize + i - 1]?.matchDate }}
               </div>
             </template>
             <div v-else class="compare-placeholder"></div>
           </div>
         </div>
         <div class="compare-controls">
+          <el-radio-group :model-value="gridMode" size="small" @update:model-value="emit('update:gridMode', $event as '2' | '4')">
+            <el-radio-button value="2">2宫格</el-radio-button>
+            <el-radio-button value="4">4宫格</el-radio-button>
+          </el-radio-group>
+          <div class="compare-controls-divider"></div>
           <el-button
             v-if="isCompareFirstPage && hasPrevCompareTrees"
             type="primary"
@@ -307,7 +322,7 @@ watch(() => props.modelValue, (val) => {
   padding: 0 !important;
   display: flex;
   flex-direction: column;
-  height: calc(100% - 54px);
+  height: calc(100% - 44px);
   overflow: hidden;
 }
 
@@ -322,30 +337,37 @@ watch(() => props.modelValue, (val) => {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 16px;
-  padding: 8px 0;
+  gap: 8px;
+  padding: 4px 0;
   flex-shrink: 0;
 }
 
 .compare-controls-divider {
   width: 1px;
-  height: 24px;
+  height: 20px;
   background: #dcdfe6;
-  margin: 0 8px;
+  margin: 0 4px;
 }
 
 .compare-page-info {
-  font-size: 14px;
+  font-size: 13px;
   color: #606266;
 }
 
 .compare-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  grid-template-rows: 1fr 1fr;
-  gap: 10px;
+  gap: 2px;
   flex: 1;
   min-height: 0;
+}
+
+.compare-grid--4 {
+  grid-template-rows: 1fr 1fr;
+}
+
+.compare-grid--2 {
+  grid-template-rows: 1fr;
 }
 
 .compare-cell {
@@ -353,7 +375,7 @@ watch(() => props.modelValue, (val) => {
   flex-direction: column;
   align-items: center;
   border: 1px solid #e4e7ed;
-  border-radius: 8px;
+  border-radius: 2px;
   overflow: hidden;
   background: #fff;
   min-height: 0;
@@ -407,21 +429,35 @@ watch(() => props.modelValue, (val) => {
 
 .review-buttons {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: 6px;
+  right: 6px;
   display: flex;
-  gap: 6px;
+  gap: 4px;
   z-index: 10;
 }
 
+.review-buttons--bottom {
+  top: auto;
+  right: 50%;
+  transform: translateX(50%);
+  bottom: 6px;
+  gap: 20px;
+}
+
+.review-buttons--bottom .review-btn {
+  width: 120px;
+  height: 120px;
+  font-size: 48px;
+}
+
 .review-btn {
-  width: 36px;
-  height: 36px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   border: 2px solid #dcdfe6;
   background: rgba(0, 0, 0, 0.45);
   cursor: pointer;
-  font-size: 18px;
+  font-size: 15px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -470,9 +506,9 @@ watch(() => props.modelValue, (val) => {
 }
 
 .loading-spinner {
-  width: 60px;
-  height: 60px;
-  border: 4px solid #e4e7ed;
+  width: 40px;
+  height: 40px;
+  border: 3px solid #e4e7ed;
   border-top-color: #409eff;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
@@ -485,8 +521,8 @@ watch(() => props.modelValue, (val) => {
 }
 
 .compare-label {
-  padding: 4px 0;
-  font-size: 12px;
+  padding: 2px 0;
+  font-size: 11px;
   color: #666;
   background: #f5f7fa;
   width: 100%;
