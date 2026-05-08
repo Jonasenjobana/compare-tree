@@ -6,9 +6,19 @@ import { api as viewerApi } from 'v-viewer'
 import type { ReviewRecord } from '@/api/tree'
 import { Edit } from '@element-plus/icons-vue'
 
+const isViewerOpen = ref(false)
+
 function openImageViewer(url: string) {
   if (!url) return
-  viewerApi({ images: [url] })
+  isViewerOpen.value = true
+  viewerApi({
+    images: [url],
+    options: {
+      hidden: () => {
+        isViewerOpen.value = false
+      }
+    }
+  })
 }
 
 const props = defineProps<{
@@ -146,6 +156,7 @@ const gridClass = computed(() => `compare-grid--${props.gridMode}`)
     :title="viewMode === 'timeline' ? '时间轴比对' : '树形比对'"
     fullscreen
     append-to-body
+    :close-on-press-escape="!isViewerOpen"
     @update:model-value="emit('update:modelValue', $event)"
     @closed="emit('closed')"
     @keydown="emit('keydown', $event)"

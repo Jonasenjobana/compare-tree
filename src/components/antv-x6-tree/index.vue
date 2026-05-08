@@ -1,9 +1,9 @@
 <template>
   <div ref="containerRef" class="x6-diagram">
-    <div v-if="loading" class="tree-loading-overlay">
+  </div>
+   <div v-if="loading" class="tree-loading-overlay">
       <div class="tree-loading-spinner"></div>
       <span class="tree-loading-text">加载中...</span>
-    </div>
   </div>
 </template>
 
@@ -831,7 +831,7 @@ defineExpose({
   justify-content: center;
   background: rgba(255, 255, 255, 0.5);
   z-index: 100;
-  pointer-events: none;
+  user-select: none;
 }
 
 .tree-loading-spinner {
