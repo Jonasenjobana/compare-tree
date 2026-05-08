@@ -22,6 +22,7 @@ export function useTreeData() {
       score: node.score,
       matchDate: node.matchDate,
       imageUrl: node.selfUrl,
+      rootId: node.rootId,
       selfUrl: node.selfUrl,
       reviewResult: node.reviewResult,
     }

@@ -31,6 +31,7 @@ const {
   handleCompareKeydown, onCompareClosed, openCompareForNode,
   gridMode, childPageSize,
   isSingleNodePreview, singlePreviewImage, singlePreviewLabel,
+  compareTreeName, compareTreeRootId, updateTreeName,
 } = useCompareDialog(allTrees, viewMode)
 
 const goJsTreeRef = ref<any>(null)
@@ -48,7 +49,10 @@ const handleNodeSelect = (node: Node) => {
   selectedNode.value = node
   focusNodeId.value = node.id
 }
-
+const handleEdgeClick = (node: Node) => {
+  const {parentId} = node;
+  openCompareForNode(nodes.value.find((n) => n.id === parentId)!, node.selfId)
+}
 const handleNodeDoubleClick = (node: Node) => {
   openCompareForNode(node)
 }
@@ -100,8 +104,11 @@ function scrollTreeListToActive() {
   })
 }
 
-watch(selectedTreeId, () => {
+watch(selectedTreeId, (rootId) => {
   scrollTreeListToActive()
+  if (rootId) {
+    focusNodeId.value = rootId
+  }
 })
 
 watch(compareTreeIndex, (newIdx) => {
@@ -138,6 +145,7 @@ onBeforeUnmount(() => {
         :trees="currentTree ? [currentTree] : []"
         :timeline-order="timelineOrder"
         :loading="treeLoading"
+        @edge-click="handleEdgeClick"
         @node-select="handleNodeSelect"
         @node-double-click="handleNodeDoubleClick"
       />
@@ -183,8 +191,9 @@ onBeforeUnmount(() => {
             :key="tree.rootId"
             class="tree-item"
             :class="{ active: selectedTreeId === tree.rootId }"
+             @click="changeSelectedTree(tree.rootId)"
           >
-            <div class="tree-info" @click="changeSelectedTree(tree.rootId)">
+            <div class="tree-info">
               <span class="tree-id">{{ tree.treeName ? tree.treeName + '(' + tree.rootId + ')' : tree.rootId }}</span>
             </div>
           </div>
@@ -224,6 +233,8 @@ onBeforeUnmount(() => {
       :is-single-node-preview="isSingleNodePreview"
       :single-preview-image="singlePreviewImage"
       :single-preview-label="singlePreviewLabel"
+      :compare-tree-name="compareTreeName"
+      :compare-tree-root-id="compareTreeRootId"
       @update:compare-page="comparePage = $event"
       @update:compare-child-page="compareChildPage = $event"
       @update:grid-mode="gridMode = $event"
@@ -236,6 +247,7 @@ onBeforeUnmount(() => {
       @closed="onCompareClosed"
       @keydown="handleCompareKeydown"
       @submit-review="handleSubmitReview"
+      @update-tree-name="updateTreeName"
     />
   </div>
 </template>

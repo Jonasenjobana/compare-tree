@@ -2,7 +2,8 @@ import { ref, computed, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { Node, TreeNode, TreeRoot } from '@/types'
 import { findTreeNodeById, buildTreeCompareFrames, type CompareFrame } from '@/utils/tree-utils'
-import { getTreeByRootId } from '@/api/tree'
+import { getTreeByRootId, updateRootName } from '@/api/tree'
+import { ElMessage } from 'element-plus'
 
 export type { CompareFrame }
 
@@ -27,6 +28,29 @@ export function useCompareDialog(
   const singlePreviewLabel = ref('')
   const isSingleNodePreview = computed(() => viewMode.value === 'tree' && compareTreeFrames.value.length === 0 && compareVisible.value)
 
+  const compareTreeName = ref('')
+  const compareTreeRootId = computed(() => {
+    const tree = allTrees.value[compareTreeIndex.value]
+    return tree?.rootId || ''
+  })
+
+  async function updateTreeName(newName: string) {
+    const rootId = compareTreeRootId.value
+    if (!rootId) return
+    try {
+      await updateRootName({ rootId, name: newName })
+      const tree = allTrees.value.find((t) => t.rootId === rootId)
+      if (tree) {
+        tree.treeName = newName
+      }
+      compareTreeName.value = newName
+      ElMessage.success('树名称修改成功')
+    } catch (error) {
+      console.error('修改树名称失败:', error)
+      ElMessage.error('修改树名称失败')
+    }
+  }
+
   watch(gridMode, () => {
     compareChildPage.value = 0
     comparePage.value = 0
@@ -35,6 +59,7 @@ export function useCompareDialog(
   function collectTreeNodesFlat(node: TreeNode, list: Node[]): void {
     list.push({
       id: node.selfId,
+      rootId: node.rootId,
       parentId: node.parentId,
       selfId: node.selfId,
       score: node.score,
@@ -50,6 +75,7 @@ export function useCompareDialog(
   function loadCompareTreeFromData(tree: TreeRoot, index: number) {
     if (!tree.tree) return
     compareTreeIndex.value = index
+    compareTreeName.value = tree.treeName || ''
     compareRootImage.value = tree.tree.selfUrl
     compareRootLabel.value = `${tree.tree.selfId} ${tree.tree.matchDate}`
     const allNodes: Node[] = []
@@ -223,17 +249,18 @@ export function useCompareDialog(
     compareChildPage.value = 0
     singlePreviewImage.value = ''
     singlePreviewLabel.value = ''
+    compareTreeName.value = ''
   }
 
-  async function openCompareForNode(node: Node) {
-    const idx = allTrees.value.findIndex((t) => t.rootId === node.selfId || t.rootId === node.parentId || t.rootId === node.id)
+  async function openCompareForNode(node: Node, childId?: string) {
+    const idx = allTrees.value.findIndex((t) => t.rootId == node.rootId)
     if (idx === -1) return
-    compareTreeIndex.value = idx
 
     try {
       const rootInfo = allTrees.value[idx]!
       const res = await getTreeByRootId(rootInfo.rootId)
       const tree = res.tree
+      compareTreeName.value = tree.treeName || ''
       if (!tree.tree) {
         compareTreeFrames.value = []
         compareFrameIndex.value = 0
@@ -261,6 +288,10 @@ export function useCompareDialog(
         }
       }
       compareVisible.value = true
+      if (childId) {
+        const prevFrame = compareTreeFrames.value[compareFrameIndex.value]!
+        compareChildPage.value = Math.min(maxChildPage.value - 1, Math.ceil(prevFrame.children.findIndex((c) => c.selfId === childId) / childPageSize.value));
+      }
     } catch (error) {
       console.error('打开比对失败:', error)
     }
@@ -301,5 +332,8 @@ export function useCompareDialog(
     isSingleNodePreview,
     singlePreviewImage,
     singlePreviewLabel,
+    compareTreeName,
+    compareTreeRootId,
+    updateTreeName,
   }
 }

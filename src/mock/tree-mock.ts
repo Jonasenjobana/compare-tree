@@ -79,6 +79,14 @@ export function getMockAllRootIds(): Promise<TreeResponse> {
   });
 }
 
+export function mockUpdateRootName(rootId: string, name: string): Promise<{ success: boolean }> {
+  const root = mockRootIds.find((r) => r.rootId === rootId)
+  if (root) {
+    root.treeName = name
+  }
+  return Promise.resolve({ success: true })
+}
+
 export function getMockTreeByRootId(rootId: string): Promise<NodeResponse> {
   const treeNode = mockTreesMap[rootId];
   const root = mockRootIds.find((r) => r.rootId === rootId);

@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { reactive, computed, watch } from 'vue'
+import { reactive, computed, watch, ref } from 'vue'
 import type { Node } from '@/types'
 import type { CompareFrame } from '@/utils/tree-utils'
 import { api as viewerApi } from 'v-viewer'
 import type { ReviewRecord } from '@/api/tree'
+import { Edit } from '@element-plus/icons-vue'
 
 function openImageViewer(url: string) {
   if (!url) return
@@ -36,6 +37,8 @@ const props = defineProps<{
   isSingleNodePreview: boolean
   singlePreviewImage: string
   singlePreviewLabel: string
+  compareTreeName: string
+  compareTreeRootId: string
 }>()
 
 const emit = defineEmits<{
@@ -52,9 +55,30 @@ const emit = defineEmits<{
   'closed': []
   'keydown': [e: KeyboardEvent]
   'submit-review': [records: ReviewRecord[]]
+  'update-tree-name': [name: string]
 }>()
 
 const reviewStates = reactive<Record<string, '一致' | '不一致' | undefined>>({})
+
+const isEditingName = ref(false)
+const editingName = ref('')
+
+function startEditName() {
+  editingName.value = props.compareTreeName
+  isEditingName.value = true
+}
+
+function confirmEditName() {
+  const newName = editingName.value.trim()
+  if (newName && newName !== props.compareTreeName) {
+    emit('update-tree-name', newName)
+  }
+  isEditingName.value = false
+}
+
+function cancelEditName() {
+  isEditingName.value = false
+}
 
 function getReviewKey(childIndex: number): string {
   return `${props.compareFrameIndex}-${childIndex}`
@@ -126,6 +150,17 @@ const gridClass = computed(() => `compare-grid--${props.gridMode}`)
     @closed="emit('closed')"
     @keydown="emit('keydown', $event)"
   >
+    <div v-if="viewMode === 'tree'" class="tree-name-bar">
+      <template v-if="!isEditingName">
+        <span v-if="compareTreeName" class="tree-name-text">{{ compareTreeName }}</span>
+        <el-button size="small" :icon="Edit" circle @click="startEditName" />
+      </template>
+      <template v-else>
+        <el-input v-model="editingName" size="small" class="tree-name-input" @keyup.enter="confirmEditName" />
+        <el-button size="small" type="primary" @click="confirmEditName">修改</el-button>
+        <el-button size="small" @click="cancelEditName">取消</el-button>
+      </template>
+    </div>
     <template v-if="isSingleNodePreview">
       <div class="single-preview">
         <el-image :src="singlePreviewImage" fit="contain" class="single-preview-image" @dblclick="openImageViewer(singlePreviewImage)">
@@ -374,6 +409,26 @@ const gridClass = computed(() => `compare-grid--${props.gridMode}`)
   flex-direction: column;
   height: calc(100% - 44px);
   overflow: hidden;
+}
+
+.tree-name-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: #f5f7fa;
+  flex-shrink: 0;
+  border-bottom: 1px solid #e4e7ed;
+}
+
+.tree-name-text {
+  color: #909399;
+  font-size: 14px;
+}
+
+.tree-name-input {
+  width: 200px;
 }
 
 .single-preview {

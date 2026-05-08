@@ -27,5 +27,6 @@ export const getLineColor = (score: number, isModified: boolean, reviewResult?: 
  */
 export const getEdgeLabel = (score: number, reviewResult?: string): string => {
   if (reviewResult === '不一致') return '✘'
+  if (reviewResult === '一致') return '✔'
   return score.toFixed(2)
 }

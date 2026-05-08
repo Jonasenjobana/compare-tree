@@ -31,6 +31,7 @@ const emit = defineEmits<{
   nodeSelect: [node: Node];
   nodeDoubleClick: [node: Node];
   scaleChange: [scale: number];
+  edgeClick: [node: Node];
 }>();
 
 const containerRef = ref<HTMLDivElement | null>(null);
@@ -231,7 +232,7 @@ async function layoutTree(treeNodes: Node[]): Promise<{ nodes: any[]; edges: any
           attrs: {
             label: {
               text: edgeLabel,
-              fill: reviewResult === '不一致' ? "#ff0000" : "#333",
+              fill: reviewResult === '不一致' ? "#ff0000" : reviewResult === '一致' ? "#67c23a" : "#333",
               fontSize: 12,
             },
             rect: {
@@ -642,6 +643,14 @@ const initGraph = () => {
     if (data && !data._isLabel) emit("nodeDoubleClick", data);
   });
 
+  graph.on("edge:click", ({ edge }) => {
+    const targetNode = edge.getTargetNode();
+    if (targetNode) {
+      const data = targetNode.getData() as NodeData;
+      if (data && !data._isLabel) emit("edgeClick", data);
+    }
+  });
+
   graph.on("node:mouseenter", ({ node }) => {
     const edges = graph!.getConnectedEdges(node);
     edges.forEach((edge) => {
@@ -792,7 +801,6 @@ const locateNode = (nodeId: string) => {
       selection.reset(cell);
     }
     graph.centerCell(cell);
-    graph.scale(1.1);
   }
 };
 

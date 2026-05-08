@@ -1,6 +1,6 @@
 import request from '@/utils/request'
 import type { NodeResponse, TreeResponse } from '@/types'
-import { getMockAllRootIds, getMockTreeByRootId } from '@/mock/tree-mock'
+import { getMockAllRootIds, getMockTreeByRootId, mockUpdateRootName } from '@/mock/tree-mock'
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 
@@ -29,4 +29,16 @@ export function getTreeByRootId(rootId: string): Promise<NodeResponse> {
 
 export function batchReview(data: BatchReviewRequest): Promise<any> {
   return request.post('/batch_review', data)
+}
+
+export interface UpdateRootNameRequest {
+  rootId: string
+  name: string
+}
+
+export function updateRootName(data: UpdateRootNameRequest): Promise<any> {
+  if (USE_MOCK) {
+    return mockUpdateRootName(data.rootId, data.name)
+  }
+  return request.post('/update_root_name', data)
 }

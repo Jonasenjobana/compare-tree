@@ -42,6 +42,7 @@ export interface Node {
   matchDate: string
   imageUrl: string
   selfUrl: string
+  rootId: string
   isModified?: boolean
   reviewResult?: string
 }
