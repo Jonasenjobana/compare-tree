@@ -9,6 +9,10 @@ export interface TreeNode {
   matchDate: string
   score: number
   children: TreeNode[]
+
+  manualReview: string
+  reviewResult: string
+  intelligentRecommend: string
 }
 
 export interface TreeRoot {
@@ -32,6 +36,7 @@ export interface Node {
   imageUrl: string
   selfUrl: string
   isModified?: boolean
+  reviewResult?: string
 }
 
 export interface LinkData {
@@ -39,4 +44,5 @@ export interface LinkData {
   to: string
   score: number
   isModified: boolean
+  reviewResult?: string
 }

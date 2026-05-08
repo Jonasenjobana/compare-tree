@@ -7,7 +7,7 @@ import { ref, onMounted, watch, onBeforeUnmount } from "vue";
 import { Graph, Selection } from "@antv/x6";
 import { AntVDagreLayout } from "@antv/layout";
 import type { Node, LinkData, TreeRoot } from "@/types";
-import { getLineWidth, getLineColor } from "@/utils/gojs-utils";
+import { getLineWidth, getLineColor, getEdgeLabel } from "@/utils/gojs-utils";
 
 interface NodeData extends Node {
   _isLabel?: boolean;
@@ -103,6 +103,7 @@ async function layoutTree(treeNodes: Node[]): Promise<{ nodes: any[]; edges: any
       to: n.id,
       score: n.score,
       isModified: n.isModified || false,
+      reviewResult: n.reviewResult,
     }));
 
   const layoutNodes = treeNodes.map((n) => ({
@@ -170,8 +171,10 @@ async function layoutTree(treeNodes: Node[]): Promise<{ nodes: any[]; edges: any
   linkDataArray.forEach((l) => {
     const score = l.score ?? 0;
     const isModified = l.isModified ?? false;
-    const lineColor = getLineColor(score, isModified);
+    const reviewResult = l.reviewResult;
+    const lineColor = getLineColor(score, isModified, reviewResult);
     const lineWidth = getLineWidth(score);
+    const edgeLabel = getEdgeLabel(score, reviewResult);
     const edgeId = `${l.from}-${l.to}`;
 
     const parentPos = nodePositionMap.get(l.from);
@@ -219,8 +222,8 @@ async function layoutTree(treeNodes: Node[]): Promise<{ nodes: any[]; edges: any
           },
           attrs: {
             label: {
-              text: score.toFixed(2),
-              fill: "#333",
+              text: edgeLabel,
+              fill: reviewResult === '不一致' ? "#ff0000" : "#333",
               fontSize: 12,
             },
             rect: {
