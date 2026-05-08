@@ -1,5 +1,10 @@
 <template>
-  <div ref="containerRef" class="x6-diagram"></div>
+  <div ref="containerRef" class="x6-diagram">
+    <div v-if="loading" class="tree-loading-overlay">
+      <div class="tree-loading-spinner"></div>
+      <span class="tree-loading-text">加载中...</span>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -19,6 +24,7 @@ const props = defineProps<{
   viewMode: "tree" | "timeline";
   trees: TreeRoot[];
   timelineOrder: "asc" | "desc";
+  loading?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -803,5 +809,41 @@ defineExpose({
   height: 100%;
   background: #f5f7fa;
   position: relative;
+}
+
+.tree-loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.5);
+  z-index: 100;
+  pointer-events: none;
+}
+
+.tree-loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #e4e7ed;
+  border-top-color: #409eff;
+  border-radius: 50%;
+  animation: tree-loading-spin 0.8s linear infinite;
+}
+
+@keyframes tree-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.tree-loading-text {
+  margin-top: 12px;
+  font-size: 14px;
+  color: #606266;
 }
 </style>

@@ -18,13 +18,20 @@ export interface TreeNode {
 export interface TreeRoot {
   rootId: string
   rootUrl: string
-  tree: TreeNode
+  tree?: TreeNode
+  treeName: string
+  maxMatchDate: string
 }
 
 export interface TreeResponse {
   success: boolean
   count: number
-  trees: TreeRoot[]
+  roots: TreeRoot[]
+}
+
+export interface NodeResponse {
+  tree: TreeRoot
+  success: boolean
 }
 
 export interface Node {

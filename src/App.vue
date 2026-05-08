@@ -7,15 +7,15 @@ import AntVX6 from '@/components/antv-x6-tree/index.vue'
 import CompareDialog from '@/components/compare-dialog/index.vue'
 import { useTreeData } from '@/composables/useTreeData'
 import { useCompareDialog } from '@/composables/useCompareDialog'
-import { batchReview } from '@/api/tree'
+import { batchReview, type ReviewRecord } from '@/api/tree'
 import type { Node } from '@/types'
 
 const {
-  allTrees, nodes, viewMode, timelineOrder,
-  searchKeyword, selectedTreeId, displayMode, pagedTreeIndex,
-  filteredTrees, hasPrevTree, hasNextTree,
-  changeSelectedTree, onDisplayModeChange,
-  goToPrevTree, goToNextTree, loadTreeData, refreshNodes,
+  allTrees, currentTree, nodes, viewMode, timelineOrder,
+  searchKeyword, selectedTreeId, pagedTreeIndex,
+  filteredTrees, hasPrevTree, hasNextTree, treeLoading,
+  changeSelectedTree,
+  goToPrevTree, goToNextTree, loadTreeData, refreshCurrentTree,
 } = useTreeData()
 
 const {
@@ -30,6 +30,7 @@ const {
   goPrevFrame, goNextFrame, prevCompareTree, nextCompareTree,
   handleCompareKeydown, onCompareClosed, openCompareForNode,
   gridMode, childPageSize,
+  isSingleNodePreview, singlePreviewImage, singlePreviewLabel,
 } = useCompareDialog(allTrees, viewMode)
 
 const goJsTreeRef = ref<any>(null)
@@ -64,7 +65,7 @@ const handleUpdateParent = (nodeId: string, newParentId: string) => {
   }
 }
 
-async function handleSubmitReview(records: { selfId: string; reviewResult: string }[]) {
+async function handleSubmitReview(records: ReviewRecord[]) {
   try {
     await batchReview({ records })
     ElMessage.success('审核提交成功')
@@ -76,16 +77,7 @@ async function handleSubmitReview(records: { selfId: string; reviewResult: strin
       }
       return n
     })
-    function updateTreeReviewResult(node: any) {
-      const newResult = recordMap.get(node.selfId)
-      if (newResult !== undefined) {
-        node.reviewResult = newResult
-      }
-      if (node.children) {
-        node.children.forEach((c: any) => updateTreeReviewResult(c))
-      }
-    }
-    allTrees.value.forEach((t) => updateTreeReviewResult(t.tree))
+    await refreshCurrentTree()
   } catch (error) {
     console.error('审核提交失败:', error)
     ElMessage.error('审核提交失败')
@@ -94,7 +86,6 @@ async function handleSubmitReview(records: { selfId: string; reviewResult: strin
 
 function handleGlobalKeydown(e: KeyboardEvent) {
   if (compareVisible.value) return
-  if (displayMode.value !== 'paged') return
   if (e.key === 'ArrowLeft') goToPrevTree()
   else if (e.key === 'ArrowRight') goToNextTree()
 }
@@ -118,16 +109,10 @@ watch(compareTreeIndex, (newIdx) => {
   const tree = allTrees.value[newIdx]
   if (!tree) return
   const rootId = tree.rootId
-  if (displayMode.value === 'paged') {
-    const idx = filteredTrees.value.findIndex((t) => t.rootId === rootId)
-    if (idx !== -1) {
-      pagedTreeIndex.value = idx
-      selectedTreeId.value = rootId
-      refreshNodes()
-    }
-  } else {
+  const idx = filteredTrees.value.findIndex((t) => t.rootId === rootId)
+  if (idx !== -1) {
+    pagedTreeIndex.value = idx
     selectedTreeId.value = rootId
-    focusNodeId.value = rootId
   }
   locateToRoot(rootId)
 })
@@ -150,12 +135,13 @@ onBeforeUnmount(() => {
         :nodes="nodes"
         :focus-node-id="focusNodeId"
         :view-mode="viewMode"
-        :trees="allTrees"
+        :trees="currentTree ? [currentTree] : []"
         :timeline-order="timelineOrder"
+        :loading="treeLoading"
         @node-select="handleNodeSelect"
         @node-double-click="handleNodeDoubleClick"
       />
-      <div v-if="displayMode === 'paged'" class="paged-controls">
+      <div class="paged-controls">
         <el-button size="small" :disabled="!hasPrevTree" @click="goToPrevTree">
           上一颗树
         </el-button>
@@ -171,12 +157,6 @@ onBeforeUnmount(() => {
           <el-radio-group v-model="viewMode" size="small">
             <el-radio-button value="tree">树形</el-radio-button>
             <el-radio-button value="timeline">时间轴</el-radio-button>
-          </el-radio-group>
-        </div>
-        <div class="view-mode-row">
-          <el-radio-group v-model="displayMode" size="small" @change="onDisplayModeChange">
-            <el-radio-button value="global">全局</el-radio-button>
-            <el-radio-button value="paged">分页</el-radio-button>
           </el-radio-group>
           <el-button
             v-if="viewMode === 'timeline'"
@@ -205,11 +185,8 @@ onBeforeUnmount(() => {
             :class="{ active: selectedTreeId === tree.rootId }"
           >
             <div class="tree-info" @click="changeSelectedTree(tree.rootId)">
-              <span class="tree-id">{{ tree.rootId }}</span>
+              <span class="tree-id">{{ tree.treeName ? tree.treeName + '(' + tree.rootId + ')' : tree.rootId }}</span>
             </div>
-            <el-button type="primary" size="small" @click.stop="locateToRoot(tree.rootId)">
-              定位
-            </el-button>
           </div>
         </div>
       </div>
@@ -244,6 +221,9 @@ onBeforeUnmount(() => {
       :has-prev-compare-trees="hasPrevCompareTrees"
       :has-more-compare-trees="hasMoreCompareTrees"
       :child-page-size="childPageSize"
+      :is-single-node-preview="isSingleNodePreview"
+      :single-preview-image="singlePreviewImage"
+      :single-preview-label="singlePreviewLabel"
       @update:compare-page="comparePage = $event"
       @update:compare-child-page="compareChildPage = $event"
       @update:grid-mode="gridMode = $event"

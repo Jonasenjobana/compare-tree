@@ -2,6 +2,13 @@
 import { reactive, computed, watch } from 'vue'
 import type { Node } from '@/types'
 import type { CompareFrame } from '@/utils/tree-utils'
+import { api as viewerApi } from 'v-viewer'
+import type { ReviewRecord } from '@/api/tree'
+
+function openImageViewer(url: string) {
+  if (!url) return
+  viewerApi({ images: [url] })
+}
 
 const props = defineProps<{
   modelValue: boolean
@@ -26,6 +33,9 @@ const props = defineProps<{
   hasPrevCompareTrees: boolean
   hasMoreCompareTrees: boolean
   childPageSize: number
+  isSingleNodePreview: boolean
+  singlePreviewImage: string
+  singlePreviewLabel: string
 }>()
 
 const emit = defineEmits<{
@@ -41,7 +51,7 @@ const emit = defineEmits<{
   'next-compare-tree': []
   'closed': []
   'keydown': [e: KeyboardEvent]
-  'submit-review': [records: { selfId: string; reviewResult: string }[]]
+  'submit-review': [records: ReviewRecord[]]
 }>()
 
 const reviewStates = reactive<Record<string, '一致' | '不一致' | undefined>>({})
@@ -83,7 +93,7 @@ const hasAnyReview = computed(() => {
 
 function submitReview() {
   if (!props.currentFrame) return
-  const records: { selfId: string; reviewResult: string }[] = []
+  const records: ReviewRecord[] = []
   props.currentFrame.children.forEach((child, idx) => {
     const state = getReviewState(idx)
     if (state) {
@@ -116,12 +126,24 @@ const gridClass = computed(() => `compare-grid--${props.gridMode}`)
     @closed="emit('closed')"
     @keydown="emit('keydown', $event)"
   >
-    <template v-if="viewMode === 'tree' && currentFrame">
+    <template v-if="isSingleNodePreview">
+      <div class="single-preview">
+        <el-image :src="singlePreviewImage" fit="contain" class="single-preview-image" @dblclick="openImageViewer(singlePreviewImage)">
+          <template #placeholder>
+            <div class="compare-image-loading">
+              <div class="loading-spinner"></div>
+            </div>
+          </template>
+        </el-image>
+        <div class="compare-label">{{ singlePreviewLabel }}</div>
+      </div>
+    </template>
+    <template v-else-if="viewMode === 'tree' && currentFrame">
       <div class="compare-body">
         <div class="compare-grid" :class="gridClass">
           <div class="compare-cell">
             <div class="compare-image-wrapper">
-              <el-image :src="currentFrame.parent.selfUrl" fit="contain" class="compare-image">
+              <el-image :src="currentFrame.parent.selfUrl" fit="contain" class="compare-image" @dblclick="openImageViewer(currentFrame.parent.selfUrl)">
                 <template #placeholder>
                   <div class="compare-image-loading">
                     <div class="loading-spinner"></div>
@@ -138,6 +160,7 @@ const gridClass = computed(() => `compare-grid--${props.gridMode}`)
                   :src="currentFrame.children[compareChildPage * childPageSize + i - 1]!.selfUrl"
                   fit="contain"
                   class="compare-image"
+                  @dblclick="openImageViewer(currentFrame.children[compareChildPage * childPageSize + i - 1]!.selfUrl)"
                 >
                   <template #placeholder>
                     <div class="compare-image-loading">
@@ -145,7 +168,29 @@ const gridClass = computed(() => `compare-grid--${props.gridMode}`)
                     </div>
                   </template>
                 </el-image>
-                <div class="review-buttons" :class="{ 'review-buttons--bottom': gridMode === '2' }">
+                <div
+                  v-if="gridMode === '4'"
+                  class="cell-corner-group"
+                  :class="`cell-corner-group--pos${i}`"
+                >
+                  <div class="score-badge score-badge--4">{{ currentFrame.children[compareChildPage * childPageSize + i - 1]!.score }}</div>
+                  <div class="review-buttons review-buttons--4">
+                    <button
+                      class="review-btn review-btn--pass"
+                      :class="{ active: getReviewState(compareChildPage * childPageSize + i - 1) === '一致' }"
+                      @click="setReviewState(compareChildPage * childPageSize + i - 1, '一致')"
+                    >✔</button>
+                    <button
+                      class="review-btn review-btn--fail"
+                      :class="{ active: getReviewState(compareChildPage * childPageSize + i - 1) === '不一致' }"
+                      @click="setReviewState(compareChildPage * childPageSize + i - 1, '不一致')"
+                    >✘</button>
+                  </div>
+                </div>
+                <div
+                  v-if="gridMode === '2'"
+                  class="review-buttons review-buttons--bottom"
+                >
                   <button
                     class="review-btn review-btn--pass"
                     :class="{ active: getReviewState(compareChildPage * childPageSize + i - 1) === '一致' }"
@@ -157,6 +202,10 @@ const gridClass = computed(() => `compare-grid--${props.gridMode}`)
                     @click="setReviewState(compareChildPage * childPageSize + i - 1, '不一致')"
                   >✘</button>
                 </div>
+                <div
+                  v-if="gridMode === '2'"
+                  class="score-badge score-badge--2"
+                >{{ currentFrame.children[compareChildPage * childPageSize + i - 1]!.score }}</div>
               </div>
               <div class="compare-label">
                 {{ currentFrame.children[compareChildPage * childPageSize + i - 1]!.selfId }}
@@ -239,7 +288,7 @@ const gridClass = computed(() => `compare-grid--${props.gridMode}`)
         <div class="compare-grid" :class="gridClass">
           <div class="compare-cell">
             <div class="compare-image-wrapper">
-              <el-image :src="compareRootImage" fit="contain" class="compare-image">
+              <el-image :src="compareRootImage" fit="contain" class="compare-image" @dblclick="openImageViewer(compareRootImage)">
                 <template #placeholder>
                   <div class="compare-image-loading">
                     <div class="loading-spinner"></div>
@@ -256,6 +305,7 @@ const gridClass = computed(() => `compare-grid--${props.gridMode}`)
                   :src="compareTimelineNodes[comparePage * childPageSize + i - 1]?.imageUrl"
                   fit="contain"
                   class="compare-image"
+                  @dblclick="openImageViewer(compareTimelineNodes[comparePage * childPageSize + i - 1]?.imageUrl || '')"
                 >
                   <template #placeholder>
                     <div class="compare-image-loading">
@@ -326,6 +376,32 @@ const gridClass = computed(() => `compare-grid--${props.gridMode}`)
   overflow: hidden;
 }
 
+.single-preview {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.single-preview .el-image {
+  width: 100% !important;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.single-preview .el-image__inner {
+  max-width: 100% !important;
+  max-height: 100% !important;
+  object-fit: contain !important;
+}
+
+.single-preview .el-image__placeholder {
+  width: 100%;
+  height: 100%;
+}
+
 .compare-body {
   display: flex;
   flex-direction: column;
@@ -376,7 +452,7 @@ const gridClass = computed(() => `compare-grid--${props.gridMode}`)
   align-items: center;
   border: 1px solid #e4e7ed;
   border-radius: 2px;
-  overflow: hidden;
+  overflow: visible;
   background: #fff;
   min-height: 0;
 }
@@ -411,7 +487,7 @@ const gridClass = computed(() => `compare-grid--${props.gridMode}`)
   width: 100%;
   flex: 1;
   min-height: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .compare-image-wrapper .el-image {
@@ -448,6 +524,63 @@ const gridClass = computed(() => `compare-grid--${props.gridMode}`)
   width: 120px;
   height: 120px;
   font-size: 48px;
+}
+
+.cell-corner-group {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  z-index: 10;
+}
+
+.cell-corner-group--pos1 {
+  bottom: 6px;
+  left: 6px;
+}
+
+.cell-corner-group--pos2 {
+  top: 6px;
+  right: 6px;
+}
+
+.cell-corner-group--pos3 {
+  top: 6px;
+  left: 6px;
+}
+
+.review-buttons--4 {
+  position: relative;
+  top: auto;
+  right: auto;
+}
+
+.score-badge {
+  position: absolute;
+  font-weight: bold;
+  font-size: 14px;
+  color: #888;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.score-badge--2 {
+  top: 50%;
+  left: 0;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.5);
+  color: #ddd;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.score-badge--4 {
+  position: relative;
+  background: rgba(0, 0, 0, 0.5);
+  color: #ddd;
+  padding: 2px 6px;
+  border-radius: 4px;
 }
 
 .review-btn {

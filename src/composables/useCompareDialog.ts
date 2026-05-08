@@ -2,6 +2,7 @@ import { ref, computed, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { Node, TreeNode, TreeRoot } from '@/types'
 import { findTreeNodeById, buildTreeCompareFrames, type CompareFrame } from '@/utils/tree-utils'
+import { getTreeByRootId } from '@/api/tree'
 
 export type { CompareFrame }
 
@@ -22,6 +23,9 @@ export function useCompareDialog(
 
   const gridMode = ref<'2' | '4'>('4')
   const childPageSize = computed(() => gridMode.value === '2' ? 1 : 3)
+  const singlePreviewImage = ref('')
+  const singlePreviewLabel = ref('')
+  const isSingleNodePreview = computed(() => viewMode.value === 'tree' && compareTreeFrames.value.length === 0 && compareVisible.value)
 
   watch(gridMode, () => {
     compareChildPage.value = 0
@@ -43,34 +47,45 @@ export function useCompareDialog(
     }
   }
 
-  function loadCompareTree(index: number) {
-    const tree = allTrees.value[index]
-    if (!tree) return
+  function loadCompareTreeFromData(tree: TreeRoot, index: number) {
+    if (!tree.tree) return
     compareTreeIndex.value = index
     compareRootImage.value = tree.tree.selfUrl
     compareRootLabel.value = `${tree.tree.selfId} ${tree.tree.matchDate}`
     const allNodes: Node[] = []
     collectTreeNodesFlat(tree.tree, allNodes)
     allNodes.sort((a, b) => a.matchDate.localeCompare(b.matchDate))
-    compareTimelineNodes.value = allNodes.filter((n) => n.selfId !== tree.tree.selfId)
+    compareTimelineNodes.value = allNodes.filter((n) => n.selfId !== tree.tree!.selfId)
     comparePage.value = 0
+  }
+
+  async function loadCompareTreeByIndex(index: number) {
+    const rootInfo = allTrees.value[index]
+    if (!rootInfo) return
+    try {
+      const res = await getTreeByRootId(rootInfo.rootId)
+      loadCompareTreeFromData(res.tree, index)
+    } catch (error) {
+      console.error('获取比对树详情失败:', error)
+    }
   }
 
   function prevCompareGroup() {
     if (compareTreeIndex.value > 0) {
-      loadCompareTree(compareTreeIndex.value - 1)
+      loadCompareTreeByIndex(compareTreeIndex.value - 1)
     }
   }
 
   function nextCompareGroup() {
     if (compareTreeIndex.value < allTrees.value.length - 1) {
-      loadCompareTree(compareTreeIndex.value + 1)
+      loadCompareTreeByIndex(compareTreeIndex.value + 1)
     }
   }
 
   const maxComparePage = computed(() => Math.max(1, Math.ceil(compareTimelineNodes.value.length / childPageSize.value)))
   const isCompareFirstPage = computed(() => comparePage.value === 0)
   const isCompareLastPage = computed(() => comparePage.value >= maxComparePage.value - 1)
+
   const hasPrevCompareTrees = computed(() => compareTreeIndex.value > 0)
   const hasMoreCompareTrees = computed(() => compareTreeIndex.value < allTrees.value.length - 1)
 
@@ -119,26 +134,64 @@ export function useCompareDialog(
     }
   }
 
-  function nextCompareTree() {
+  async function nextCompareTree() {
     if (compareTreeIndex.value < allTrees.value.length - 1) {
       const nextIdx = compareTreeIndex.value + 1
-      compareTreeIndex.value = nextIdx
-      const tree = allTrees.value[nextIdx]!
-      compareTreeFrames.value = buildTreeCompareFrames(tree.tree, tree)
-      compareFrameIndex.value = 0
-      compareChildPage.value = 0
+      const rootInfo = allTrees.value[nextIdx]
+      if (!rootInfo) return
+      try {
+        const res = await getTreeByRootId(rootInfo.rootId)
+        const tree = res.tree
+        if (!tree.tree || tree.tree.children.length === 0) {
+          compareTreeIndex.value = nextIdx
+          compareTreeFrames.value = []
+          compareFrameIndex.value = 0
+          compareChildPage.value = 0
+          singlePreviewImage.value = tree.rootUrl
+          singlePreviewLabel.value = tree.rootId
+          return
+        }
+        const frames = buildTreeCompareFrames(tree.tree, tree)
+        if (frames.length > 0) {
+          compareTreeIndex.value = nextIdx
+          compareTreeFrames.value = frames
+          compareFrameIndex.value = 0
+          compareChildPage.value = 0
+        }
+      } catch (error) {
+        console.error('获取下一棵树详情失败:', error)
+      }
     }
   }
 
-  function prevCompareTree() {
+  async function prevCompareTree() {
     if (compareTreeIndex.value > 0) {
       const prevIdx = compareTreeIndex.value - 1
-      compareTreeIndex.value = prevIdx
-      const tree = allTrees.value[prevIdx]!
-      compareTreeFrames.value = buildTreeCompareFrames(tree.tree, tree)
-      compareFrameIndex.value = compareTreeFrames.value.length - 1
-      const lastFrame = compareTreeFrames.value[compareFrameIndex.value]!
-      compareChildPage.value = Math.max(0, Math.ceil(lastFrame.children.length / childPageSize.value) - 1)
+      const rootInfo = allTrees.value[prevIdx]
+      if (!rootInfo) return
+      try {
+        const res = await getTreeByRootId(rootInfo.rootId)
+        const tree = res.tree
+        if (!tree.tree || tree.tree.children.length === 0) {
+          compareTreeIndex.value = prevIdx
+          compareTreeFrames.value = []
+          compareFrameIndex.value = 0
+          compareChildPage.value = 0
+          singlePreviewImage.value = tree.rootUrl
+          singlePreviewLabel.value = tree.rootId
+          return
+        }
+        const frames = buildTreeCompareFrames(tree.tree, tree)
+        if (frames.length > 0) {
+          compareTreeIndex.value = prevIdx
+          compareTreeFrames.value = frames
+          compareFrameIndex.value = frames.length - 1
+          const lastFrame = frames[frames.length - 1]!
+          compareChildPage.value = Math.max(0, Math.ceil(lastFrame.children.length / childPageSize.value) - 1)
+        }
+      } catch (error) {
+        console.error('获取上一棵树详情失败:', error)
+      }
     }
   }
 
@@ -168,32 +221,49 @@ export function useCompareDialog(
     compareTreeFrames.value = []
     compareFrameIndex.value = 0
     compareChildPage.value = 0
+    singlePreviewImage.value = ''
+    singlePreviewLabel.value = ''
   }
 
-  function openCompareForNode(node: Node) {
-    const idx = allTrees.value.findIndex((t) => {
-      let found = false
-      function walk(n: TreeNode) {
-        if (n.selfId === node.id) found = true
-        if (n.children && n.children.length > 0) n.children.forEach((c) => walk(c))
-      }
-      walk(t.tree)
-      return found
-    })
+  async function openCompareForNode(node: Node) {
+    const idx = allTrees.value.findIndex((t) => t.rootId === node.selfId || t.rootId === node.parentId || t.rootId === node.id)
     if (idx === -1) return
     compareTreeIndex.value = idx
 
-    if (viewMode.value === 'timeline') {
-      loadCompareTree(idx)
-    } else {
-      const tree = allTrees.value[idx]!
-      const startNode = findTreeNodeById(tree.tree, node.id)
-      if (!startNode) return
-      compareTreeFrames.value = buildTreeCompareFrames(startNode, tree)
-      compareFrameIndex.value = 0
-      compareChildPage.value = 0
+    try {
+      const rootInfo = allTrees.value[idx]!
+      const res = await getTreeByRootId(rootInfo.rootId)
+      const tree = res.tree
+      if (!tree.tree) {
+        compareTreeFrames.value = []
+        compareFrameIndex.value = 0
+        compareChildPage.value = 0
+        singlePreviewImage.value = node.selfUrl || node.imageUrl
+        singlePreviewLabel.value = node.selfId
+        compareVisible.value = true
+        return
+      }
+
+      if (viewMode.value === 'timeline') {
+        loadCompareTreeFromData(tree, idx)
+      } else {
+        const startNode = findTreeNodeById(tree.tree, node.id)
+        if (!startNode) return
+        compareTreeFrames.value = buildTreeCompareFrames(startNode, tree)
+        if (compareTreeFrames.value.length > 0) {
+          compareFrameIndex.value = 0
+          compareChildPage.value = 0
+        } else {
+          compareFrameIndex.value = 0
+          compareChildPage.value = 0
+          singlePreviewImage.value = node.selfUrl || node.imageUrl
+          singlePreviewLabel.value = node.selfId
+        }
+      }
+      compareVisible.value = true
+    } catch (error) {
+      console.error('打开比对失败:', error)
     }
-    compareVisible.value = true
   }
 
   return {
@@ -228,5 +298,8 @@ export function useCompareDialog(
     openCompareForNode,
     gridMode,
     childPageSize,
+    isSingleNodePreview,
+    singlePreviewImage,
+    singlePreviewLabel,
   }
 }

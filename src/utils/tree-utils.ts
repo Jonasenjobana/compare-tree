@@ -19,6 +19,7 @@ export { findNodeInTree as findTreeNodeById }
 
 export function findNodeById(trees: TreeRoot[], targetId: string): TreeNode | null {
   for (const root of trees) {
+    if (!root.tree) continue
     const found = findNodeInTree(root.tree, targetId)
     if (found) {
       return found
@@ -58,18 +59,19 @@ export function buildPositionMap(root: TreeNode): Map<TreeNode, string> {
 }
 
 export function buildTreeCompareFrames(startNode: TreeNode, treeRoot: TreeRoot): CompareFrame[] {
+  if (!treeRoot.tree) return []
   const positionMap = buildPositionMap(treeRoot.tree)
   const frames: CompareFrame[] = []
   const queue: TreeNode[] = [startNode]
   while (queue.length > 0) {
     const node = queue.shift()!
-    frames.push({
-      parent: node,
-      children: node.children ? [...node.children] : [],
-      position: positionMap.get(node) || '?',
-    })
-    if (node.children) {
+    if (node.children && node.children.length > 0) {
       node.children.forEach((child) => queue.push(child))
+      frames.push({
+        parent: node,
+        children: [...node.children],
+        position: positionMap.get(node) || '?',
+      })
     }
   }
   return frames

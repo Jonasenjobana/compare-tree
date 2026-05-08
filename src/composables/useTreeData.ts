@@ -1,17 +1,18 @@
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { Node, TreeRoot, TreeNode } from '@/types'
-import { getAllTrees } from '@/api/tree'
+import { getAllRootIds, getTreeByRootId } from '@/api/tree'
 
 export function useTreeData() {
   const allTrees = ref<TreeRoot[]>([])
+  const currentTree = ref<TreeRoot | null>(null)
   const nodes = ref<Node[]>([])
   const viewMode = ref<'tree' | 'timeline'>('tree')
   const timelineOrder = ref<'asc' | 'desc'>('asc')
   const searchKeyword = ref('')
   const selectedTreeId = ref('')
-  const displayMode = ref<'global' | 'paged'>('global')
   const pagedTreeIndex = ref(0)
+  const treeLoading = ref(false)
 
   function convertTreeNodeToList(node: TreeNode, list: Node[]) {
     const convertedNode: Node = {
@@ -25,25 +26,16 @@ export function useTreeData() {
       reviewResult: node.reviewResult,
     }
     list.push(convertedNode)
-
     if (node.children && node.children.length > 0) {
       node.children.forEach((child) => convertTreeNodeToList(child, list))
     }
   }
 
-  function convertTreeListToNodes(trees: TreeRoot[]) {
+  function buildNodesFromTree(tree: TreeRoot) {
+    if (!tree.tree) return
     const nodeList: Node[] = []
-    if (selectedTreeId.value) {
-      const targetTree = trees.find((t) => t.rootId === selectedTreeId.value)
-      if (targetTree) {
-        convertTreeNodeToList(targetTree.tree, nodeList)
-      }
-    } else {
-      trees.forEach((root) => {
-        convertTreeNodeToList(root.tree, nodeList)
-      })
-    }
-    return nodeList
+    convertTreeNodeToList(tree.tree, nodeList)
+    nodes.value = nodeList
   }
 
   const filteredTrees = computed(() => {
@@ -53,60 +45,52 @@ export function useTreeData() {
     )
   })
 
-  function refreshNodes() {
-    nodes.value = convertTreeListToNodes(allTrees.value)
-  }
-
-  function changeSelectedTree(rootId: string) {
-    if (displayMode.value === 'paged') {
-      const idx = filteredTrees.value.findIndex((t) => t.rootId === rootId)
-      if (idx !== -1) {
-        pagedTreeIndex.value = idx
-        selectedTreeId.value = rootId
-      }
-    } else {
-      selectedTreeId.value = rootId === selectedTreeId.value ? '' : rootId
+  async function loadTreeByRootId(rootId: string): Promise<TreeRoot | null> {
+    treeLoading.value = true
+    try {
+      const res = await getTreeByRootId(rootId)
+      currentTree.value = res.tree
+      buildNodesFromTree(res.tree)
+      return res.tree
+    } catch (error) {
+      console.error('获取树详情失败:', error)
+      ElMessage.error('获取树详情失败')
+      return null
+    } finally {
+      treeLoading.value = false
     }
-    refreshNodes()
   }
 
-  function switchToPagedMode() {
-    displayMode.value = 'paged'
-    if (!selectedTreeId.value && filteredTrees.value.length > 0) {
-      pagedTreeIndex.value = 0
-      selectedTreeId.value = filteredTrees.value[0].rootId
-    } else if (selectedTreeId.value) {
-      const idx = filteredTrees.value.findIndex((t) => t.rootId === selectedTreeId.value)
-      if (idx !== -1) pagedTreeIndex.value = idx
+  async function changeSelectedTree(rootId: string) {
+    const idx = filteredTrees.value.findIndex((t) => t.rootId === rootId)
+    if (idx !== -1) {
+      pagedTreeIndex.value = idx
+      selectedTreeId.value = rootId
     }
-    refreshNodes()
+    await loadTreeByRootId(rootId)
   }
 
-  function switchToGlobalMode() {
-    displayMode.value = 'global'
-    selectedTreeId.value = ''
-    pagedTreeIndex.value = 0
-    refreshNodes()
-  }
-
-  function onDisplayModeChange(val: 'global' | 'paged') {
-    if (val === 'paged') switchToPagedMode()
-    else switchToGlobalMode()
-  }
-
-  function goToPrevTree() {
+  async function goToPrevTree() {
     if (pagedTreeIndex.value > 0) {
       pagedTreeIndex.value--
-      selectedTreeId.value = filteredTrees.value[pagedTreeIndex.value].rootId
-      refreshNodes()
+      const rootId = filteredTrees.value[pagedTreeIndex.value]!.rootId
+      selectedTreeId.value = rootId
+      await loadTreeByRootId(rootId)
     }
   }
 
-  function goToNextTree() {
+  async function goToNextTree() {
     if (pagedTreeIndex.value < filteredTrees.value.length - 1) {
       pagedTreeIndex.value++
-      selectedTreeId.value = filteredTrees.value[pagedTreeIndex.value].rootId
-      refreshNodes()
+      const rootId = filteredTrees.value[pagedTreeIndex.value]!.rootId
+      selectedTreeId.value = rootId
+      await loadTreeByRootId(rootId)
+    }
+  }
+
+  async function refreshCurrentTree() {
+    if (selectedTreeId.value) {
+      await loadTreeByRootId(selectedTreeId.value)
     }
   }
 
@@ -115,9 +99,13 @@ export function useTreeData() {
 
   async function loadTreeData() {
     try {
-      const res = await getAllTrees()
-      allTrees.value = res.trees
-      nodes.value = convertTreeListToNodes(res.trees)
+      const res = await getAllRootIds()
+      allTrees.value = res.roots
+      if (res.roots.length > 0) {
+        pagedTreeIndex.value = 0
+        selectedTreeId.value = res.roots[0]!.rootId
+        await loadTreeByRootId(res.roots[0]!.rootId)
+      }
     } catch (error) {
       console.error('获取树数据失败:', error)
       ElMessage.error('获取树数据失败，请检查接口是否正常')
@@ -126,21 +114,21 @@ export function useTreeData() {
 
   return {
     allTrees,
+    currentTree,
     nodes,
     viewMode,
     timelineOrder,
     searchKeyword,
     selectedTreeId,
-    displayMode,
     pagedTreeIndex,
     filteredTrees,
     hasPrevTree,
     hasNextTree,
+    treeLoading,
     changeSelectedTree,
-    onDisplayModeChange,
     goToPrevTree,
     goToNextTree,
     loadTreeData,
-    refreshNodes,
+    refreshCurrentTree,
   }
 }
