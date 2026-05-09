@@ -41,10 +41,24 @@ export function useTreeData() {
 
   const filteredTrees = computed(() => {
     if (!searchKeyword.value) return allTrees.value
+    const kw = searchKeyword.value.toLowerCase()
+    const isIndex = /^\d+$/.test(kw)
+    if (isIndex) {
+      const idx = parseInt(kw, 10) - 1
+      if (idx >= 0 && idx < allTrees.value.length) {
+        return [allTrees.value[idx]!]
+      }
+      return []
+    }
     return allTrees.value.filter((tree) =>
-      tree.rootId.toLowerCase().includes(searchKeyword.value.toLowerCase())
+      tree.rootId.toLowerCase().includes(kw) ||
+      (tree.treeName && tree.treeName.toLowerCase().includes(kw))
     )
   })
+
+  function getTreeIndex(rootId: string): number {
+    return allTrees.value.findIndex((t) => t.rootId === rootId)
+  }
 
   async function loadTreeByRootId(rootId: string): Promise<TreeRoot | null> {
     treeLoading.value = true
@@ -95,6 +109,15 @@ export function useTreeData() {
     }
   }
 
+  async function refreshAllRootIds() {
+    try {
+      const res = await getAllRootIds()
+      allTrees.value = res.roots
+    } catch (error) {
+      console.error('刷新根节点列表失败:', error)
+    }
+  }
+
   const hasPrevTree = computed(() => pagedTreeIndex.value > 0)
   const hasNextTree = computed(() => pagedTreeIndex.value < filteredTrees.value.length - 1)
 
@@ -131,6 +154,8 @@ export function useTreeData() {
     goToNextTree,
     loadTreeData,
     refreshCurrentTree,
-    loadTreeByRootId
+    refreshAllRootIds,
+    loadTreeByRootId,
+    getTreeIndex
   }
 }

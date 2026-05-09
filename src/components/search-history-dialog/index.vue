@@ -1,107 +1,170 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import type { SearchHistoryItem } from '@/types'
+import { moveTreeNode } from '@/api/tree'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { api as viewerApi } from 'v-viewer'
-
-const isViewerOpen = ref(false)
-
-function openImageViewer(url: string) {
-  if (!url) return
-  isViewerOpen.value = true
-  viewerApi({
-    images: [url],
-    options: {
-      hidden: () => {
-        isViewerOpen.value = false
-      }
-    }
-  })
-}
 
 const props = defineProps<{
   modelValue: boolean
   sourceImage: string
-  sourceLabel: string
+  sourceSelfId: string
   results: SearchHistoryItem[]
 }>()
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
+  'move-success': [rootId: string]
 }>()
 
-const gridMode = ref<'2' | '4'>('4')
+const selectedName = ref<string | null>(null)
+const selectedUrl = ref('')
+const selectedScore = ref(0)
+const submitting = ref(false)
 const page = ref(0)
-const childPageSize = computed(() => gridMode.value === '2' ? 1 : 3)
-const maxPage = computed(() => Math.max(1, Math.ceil(props.results.length / childPageSize.value)))
-const gridClass = computed(() => `compare-grid--${gridMode.value}`)
+const pageSize = 1
+const maxPage = computed(() => Math.max(1, Math.ceil(props.results.length / pageSize)))
+const isLastPage = computed(() => page.value >= maxPage.value - 1)
 
-watch(gridMode, () => {
-  page.value = 0
+const currentItem = computed(() => props.results[page.value] || null)
+
+const isSelected = computed(() => {
+  if (!currentItem.value) return false
+  return selectedName.value === currentItem.value.name
 })
+
+function selectItem(item: SearchHistoryItem) {
+  if (selectedName.value === item.name) {
+    selectedName.value = null
+    selectedUrl.value = ''
+    selectedScore.value = 0
+  } else {
+    selectedName.value = item.name
+    selectedUrl.value = item.url
+    selectedScore.value = item.score
+  }
+}
+
+function openImageViewer(url: string) {
+  if (!url) return
+  viewerApi({
+    images: [url],
+    options: {
+      hidden: () => {}
+    }
+  })
+}
+
+async function confirmMove() {
+  let parentId = null
+  let score = 100
+
+  if (selectedName.value) {
+    const splitName = selectedName.value.split('_')
+    parentId = splitName.slice(0, 2).join('_')
+    score = selectedScore.value
+  }
+
+  const actionLabel = selectedName.value
+    ? `移动到 ${parentId}`
+    : '移除节点（变为根节点）'
+
+  try {
+    await ElMessageBox.confirm(
+      `确认将节点 ${props.sourceSelfId} ${actionLabel}？`,
+      '确认操作',
+      { confirmButtonText: '确认', cancelButtonText: '取消', type: 'warning' }
+    )
+  } catch {
+    return
+  }
+
+  submitting.value = true
+  try {
+    const res = await moveTreeNode({ selfId: props.sourceSelfId, parentId, score })
+    const newRootId = res.rootId || props.sourceSelfId
+    ElMessage.success('节点移动成功')
+    emit('move-success', newRootId)
+    emit('update:modelValue', false)
+  } catch (error) {
+    console.error('节点移动失败:', error)
+    ElMessage.error('节点移动失败')
+  } finally {
+    submitting.value = false
+  }
+}
 
 watch(() => props.modelValue, (val) => {
   if (val) {
+    selectedName.value = null
+    selectedUrl.value = ''
+    selectedScore.value = 0
     page.value = 0
-    gridMode.value = '4'
   }
+})
+
+watch(() => props.results, () => {
+  page.value = 0
 })
 </script>
 
 <template>
   <el-dialog
     :model-value="modelValue"
-    title="相似图片匹配"
+    title="移动节点"
     fullscreen
     append-to-body
-    :close-on-press-escape="!isViewerOpen"
     @update:model-value="emit('update:modelValue', $event)"
   >
-    <div class="search-body">
-      <div class="compare-grid" :class="gridClass">
-        <div class="compare-cell">
-          <div class="compare-image-wrapper">
-            <el-image :src="sourceImage" fit="contain" class="compare-image" @dblclick="openImageViewer(sourceImage)">
+    <div class="move-grid">
+      <div class="grid-cell">
+        <div class="cell-label">原图</div>
+        <div class="cell-image-wrap">
+          <el-image :src="sourceImage" fit="contain" class="cell-image" @dblclick="openImageViewer(sourceImage)">
+            <template #placeholder>
+              <div class="image-loading"><div class="loading-spinner"></div></div>
+            </template>
+          </el-image>
+        </div>
+        <div class="cell-id">{{ sourceSelfId }}</div>
+      </div>
+
+      <div
+        class="grid-cell grid-cell--candidate"
+        :class="{ 'grid-cell--active': isSelected }"
+        @click="currentItem && selectItem(currentItem)"
+      >
+        <template v-if="currentItem">
+          <div class="cell-label">匹配图</div>
+          <div class="cell-image-wrap">
+            <el-image :src="currentItem.url" fit="contain" class="cell-image" @dblclick.stop="openImageViewer(currentItem.url)">
               <template #placeholder>
-                <div class="compare-image-loading">
-                  <div class="loading-spinner"></div>
-                </div>
+                <div class="image-loading"><div class="loading-spinner"></div></div>
               </template>
             </el-image>
+            <div class="score-tag">{{ currentItem.score.toFixed(4) }}</div>
           </div>
-          <div class="compare-label">{{ sourceLabel }} (原匹配图)</div>
-        </div>
-        <div v-for="i in childPageSize" :key="i" class="compare-cell">
-          <template v-if="results[page * childPageSize + i - 1]">
-            <div class="compare-image-wrapper">
-              <el-image
-                :src="results[page * childPageSize + i - 1]!.url"
-                fit="contain"
-                class="compare-image"
-                @dblclick="openImageViewer(results[page * childPageSize + i - 1]!.url)"
-              >
-                <template #placeholder>
-                  <div class="compare-image-loading">
-                    <div class="loading-spinner"></div>
-                  </div>
-                </template>
-              </el-image>
-              <div :class="`score-badge score-badge--${gridMode}`">{{ results[page * childPageSize + i - 1]!.score.toFixed(4) }}</div>
-            </div>
-            <div class="compare-label">{{ results[page * childPageSize + i - 1]!.name }}</div>
-          </template>
-          <div v-else class="compare-placeholder"></div>
-        </div>
+          <div class="cell-id">{{ currentItem.name }}</div>
+        </template>
+        <template v-else>
+          <div class="cell-label">匹配图</div>
+          <div class="empty-cell">暂无</div>
+        </template>
       </div>
-      <div class="compare-controls">
-        <el-radio-group :model-value="gridMode" size="small" @update:model-value="gridMode = $event as '2' | '4'">
-          <el-radio-button value="2">2宫格</el-radio-button>
-          <el-radio-button value="4">4宫格</el-radio-button>
-        </el-radio-group>
-        <div class="compare-controls-divider"></div>
-        <el-button size="small" :disabled="page === 0" @click="page--">上一页</el-button>
-        <span class="compare-page-info">{{ page + 1 }} / {{ maxPage }}</span>
-        <el-button size="small" :disabled="page >= maxPage - 1" @click="page++">下一页</el-button>
-      </div>
+    </div>
+
+    <div class="bottom-bar">
+      <el-button size="small" :disabled="page === 0" @click="selectedName = null;page--">上一页</el-button>
+      <span class="page-info">{{ page + 1 }} / {{ maxPage }}</span>
+      <el-button size="small" :disabled="isLastPage" @click="selectedName = null;page++">下一页</el-button>
+      <el-button
+        size="small"
+        type="primary"
+        :loading="submitting"
+        @click="confirmMove"
+      >
+        {{ selectedName ? '确认移动' : '确认移除（根节点）' }}
+      </el-button>
     </div>
   </el-dialog>
 </template>
@@ -115,132 +178,124 @@ watch(() => props.modelValue, (val) => {
   overflow: hidden;
 }
 
-.search-body {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden;
-}
-
-.compare-controls {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 0;
-  flex-shrink: 0;
-}
-
-.compare-controls-divider {
-  width: 1px;
-  height: 20px;
-  background: #dcdfe6;
-  margin: 0 4px;
-}
-
-.compare-page-info {
-  font-size: 13px;
-  color: #606266;
-}
-
-.compare-grid {
+.move-grid {
+  flex: 1;
+  min-height: 0;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 2px;
-  flex: 1;
-  min-height: 0;
-}
-
-.compare-grid--4 {
-  grid-template-rows: 1fr 1fr;
-}
-
-.compare-grid--2 {
   grid-template-rows: 1fr;
+  gap: 2px;
+  background: #e4e7ed;
 }
 
-.compare-cell {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  border: 1px solid #e4e7ed;
-  border-radius: 2px;
-  overflow: visible;
+.grid-cell {
+  position: relative;
   background: #fff;
-  min-height: 0;
-}
-
-.compare-cell .el-image {
-  width: 100%;
-  flex: 1;
-  min-height: 0;
   overflow: hidden;
+  min-height: 0;
 }
 
-.compare-cell .el-image__placeholder {
+.grid-cell--candidate {
+  cursor: pointer;
+  border: 3px solid transparent;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.grid-cell--active {
+  border-color: #409eff;
+  box-shadow: 0 0 0 3px rgba(64, 158, 255, 0.35), inset 0 0 20px rgba(64, 158, 255, 0.1);
+}
+
+.cell-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.45), transparent);
+  z-index: 10;
+  pointer-events: none;
+}
+
+.cell-image-wrap {
   width: 100%;
   height: 100%;
 }
 
-.compare-cell .el-image__inner {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain !important;
-}
-
-.compare-image {
+.cell-image {
   width: 100%;
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
+  height: 100%;
 }
 
-.compare-image-wrapper {
-  position: relative;
-  width: 100%;
-  flex: 1;
-  min-height: 0;
-  overflow: visible;
-}
-
-.compare-image-wrapper .el-image {
+.cell-image :deep(.el-image__inner) {
   width: 100% !important;
   height: 100% !important;
-  max-width: 100% !important;
-  max-height: 100% !important;
-}
-
-.compare-image-wrapper .el-image__inner {
-  max-width: 100% !important;
-  max-height: 100% !important;
   object-fit: contain !important;
 }
 
-.score-badge {
+.score-tag {
   position: absolute;
+  bottom: 24px;
+  left: 4px;
   font-weight: bold;
-  font-size: 14px;
-  z-index: 10;
-  pointer-events: none;
+  font-size: 13px;
   background: rgba(0, 0, 0, 0.5);
   color: #ddd;
   padding: 2px 6px;
   border-radius: 4px;
+  pointer-events: none;
+  z-index: 10;
 }
-.score-badge--2 {
-  top: 50%;
-  transform: translate(-50%, -50%);
-}
-.score-badge--4 {
-  top: 0;
+
+.cell-id {
+  position: absolute;
+  bottom: 0;
   left: 0;
+  right: 0;
+  padding: 2px 8px 4px;
+  font-size: 11px;
+  color: #fff;
+  background: linear-gradient(to top, rgba(0,0,0,0.45), transparent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  z-index: 10;
+  pointer-events: none;
 }
 
-
-.compare-image-loading {
+.empty-cell {
   width: 100%;
   height: 100%;
-  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #c0c4cc;
+  font-size: 14px;
+}
+
+.bottom-bar {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  flex-shrink: 0;
+  background: #fff;
+  border-top: 1px solid #e4e7ed;
+}
+
+.page-info {
+  font-size: 13px;
+  color: #606266;
+  margin: 0 4px;
+}
+
+.image-loading {
+  width: 100%;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -248,8 +303,8 @@ watch(() => props.modelValue, (val) => {
 }
 
 .loading-spinner {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   border: 3px solid #e4e7ed;
   border-top-color: #409eff;
   border-radius: 50%;
@@ -260,22 +315,5 @@ watch(() => props.modelValue, (val) => {
   to {
     transform: rotate(360deg);
   }
-}
-
-.compare-label {
-  padding: 2px 0;
-  font-size: 11px;
-  color: #666;
-  background: #f5f7fa;
-  width: 100%;
-  text-align: center;
-  flex-shrink: 0;
-}
-
-.compare-placeholder {
-  flex: 1;
-  width: 100%;
-  background: #e8e8e8;
-  min-height: 0;
 }
 </style>

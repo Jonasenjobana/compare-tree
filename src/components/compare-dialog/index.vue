@@ -434,7 +434,7 @@ const gridClass = computed(() => `compare-grid--${props.gridMode}`)
   </el-dialog>
 </template>
 
-<style>
+<style scoped>
 .el-dialog__body {
   padding: 0 !important;
   display: flex;
@@ -464,35 +464,49 @@ const gridClass = computed(() => `compare-grid--${props.gridMode}`)
 }
 
 .single-preview {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.single-preview .el-image {
-  width: 100% !important;
   flex: 1;
   min-height: 0;
+  position: relative;
   overflow: hidden;
 }
 
-.single-preview .el-image__inner {
-  max-width: 100% !important;
-  max-height: 100% !important;
+.single-preview :deep(.el-image) {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.single-preview :deep(.el-image__inner) {
+  width: 100% !important;
+  height: 100% !important;
   object-fit: contain !important;
 }
 
-.single-preview .el-image__placeholder {
+.single-preview :deep(.el-image__placeholder) {
   width: 100%;
   height: 100%;
+}
+
+.single-preview .compare-label {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 2px 8px 4px;
+  font-size: 11px;
+  color: #fff;
+  background: linear-gradient(to top, rgba(0,0,0,0.45), transparent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  z-index: 10;
+  pointer-events: none;
 }
 
 .compare-body {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -523,6 +537,7 @@ const gridClass = computed(() => `compare-grid--${props.gridMode}`)
   gap: 2px;
   flex: 1;
   min-height: 0;
+  overflow: hidden;
 }
 
 .compare-grid--4 {
@@ -534,60 +549,53 @@ const gridClass = computed(() => `compare-grid--${props.gridMode}`)
 }
 
 .compare-cell {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  border: 1px solid #e4e7ed;
-  border-radius: 2px;
-  overflow: visible;
+  position: relative;
+  overflow: hidden;
   background: #fff;
   min-height: 0;
 }
 
-.compare-cell .el-image {
-  width: 100%;
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.compare-cell .el-image__placeholder {
+.compare-image-wrapper {
   width: 100%;
   height: 100%;
 }
 
-.compare-cell .el-image__inner {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain !important;
-}
-
-.compare-image {
-  width: 100%;
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.compare-image-wrapper {
-  position: relative;
-  width: 100%;
-  flex: 1;
-  min-height: 0;
-  overflow: visible;
-}
-
-.compare-image-wrapper .el-image {
+.compare-image-wrapper :deep(.el-image) {
   width: 100% !important;
   height: 100% !important;
-  max-width: 100% !important;
-  max-height: 100% !important;
 }
 
-.compare-image-wrapper .el-image__inner {
-  max-width: 100% !important;
-  max-height: 100% !important;
+.compare-image-wrapper :deep(.el-image__inner) {
+  width: 100% !important;
+  height: 100% !important;
   object-fit: contain !important;
+}
+
+.compare-image-wrapper :deep(.el-image__placeholder) {
+  width: 100%;
+  height: 100%;
+}
+
+.compare-cell .compare-label {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 2px 8px 4px;
+  font-size: 11px;
+  color: #fff;
+  background: linear-gradient(to top, rgba(0,0,0,0.45), transparent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.compare-placeholder {
+  width: 100%;
+  height: 100%;
+  background: #e8e8e8;
 }
 
 .review-buttons {
@@ -601,7 +609,7 @@ const gridClass = computed(() => `compare-grid--${props.gridMode}`)
 
 .review-bar {
   position: absolute;
-  bottom: 0;
+  bottom: 28px;
   left: 0;
   right: 0;
   display: flex;
@@ -668,7 +676,7 @@ const gridClass = computed(() => `compare-grid--${props.gridMode}`)
 }
 
 .cell-corner-group--pos1 {
-  bottom: 6px;
+  bottom: 28px;
   left: 6px;
 }
 
@@ -689,7 +697,6 @@ const gridClass = computed(() => `compare-grid--${props.gridMode}`)
 }
 
 .score-badge {
-  position: absolute;
   font-weight: bold;
   font-size: 14px;
   color: #888;
@@ -698,9 +705,9 @@ const gridClass = computed(() => `compare-grid--${props.gridMode}`)
 }
 
 .score-badge--2 {
-  top: 50%;
-  left: 0;
-  transform: translate(-50%, -50%);
+  position: absolute;
+  top: 6px;
+  left: 6px;
   background: rgba(0, 0, 0, 0.5);
   color: #ddd;
   padding: 2px 6px;
@@ -783,22 +790,5 @@ const gridClass = computed(() => `compare-grid--${props.gridMode}`)
   to {
     transform: rotate(360deg);
   }
-}
-
-.compare-label {
-  padding: 2px 0;
-  font-size: 11px;
-  color: #666;
-  background: #f5f7fa;
-  width: 100%;
-  text-align: center;
-  flex-shrink: 0;
-}
-
-.compare-placeholder {
-  flex: 1;
-  width: 100%;
-  background: #e8e8e8;
-  min-height: 0;
 }
 </style>

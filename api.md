@@ -37,3 +37,17 @@ JSON:
     ]
 }
 ```
+## 移动节点接口
+描述： 移动节点到新的位置
+API: /move_tree_node
+METHOD: post
+Params:
+```json
+{
+    "selfId": "DNS1833_1",
+    "parentId": "DNS1833_2", // 新的父节点ID
+    "score": 80, // 搜索历史接口的score
+    "selfId": "DNS1833_1",
+    "rootId": "DNS1000_2"
+}
+```

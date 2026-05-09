@@ -54,3 +54,18 @@ export function searchHistory(data: SearchHistoryRequest): Promise<SearchHistory
   }
   return request.post<SearchHistoryResponse, SearchHistoryResponse>('/search_history', data)
 }
+
+export interface MoveTreeNodeRequest {
+  selfId: string
+  parentId: string | null
+  score: number
+}
+
+export interface MoveTreeNodeResponse {
+  selfId: string
+  rootId: string
+}
+
+export function moveTreeNode(data: MoveTreeNodeRequest): Promise<MoveTreeNodeResponse> {
+  return request.post<MoveTreeNodeResponse, MoveTreeNodeResponse>('/move_tree_node', data)
+}

@@ -21,6 +21,7 @@ export interface TreeRoot {
   tree?: TreeNode
   treeName: string
   maxMatchDate: string
+  nodeCount: number
 }
 
 export interface TreeResponse {

@@ -10,7 +10,8 @@ export type { CompareFrame }
 export function useCompareDialog(
   allTrees: Ref<TreeRoot[]>,
   viewMode: Ref<'tree' | 'timeline'>,
-  loadTreeByRootId: (rootId: string) => Promise<TreeRoot | null>
+  loadTreeByRootId: (rootId: string) => Promise<TreeRoot | null>,
+  selectedTreeId: Ref<string>
 ) {
   const compareVisible = ref(false)
   const compareRootImage = ref('')
@@ -57,6 +58,40 @@ export function useCompareDialog(
   watch(gridMode, () => {
     compareChildPage.value = 0
     comparePage.value = 0
+  })
+
+  watch(selectedTreeId, async (rootId) => {
+    if (!compareVisible.value || !rootId) return
+    const idx = allTrees.value.findIndex((t) => t.rootId === rootId)
+    if (idx === -1 || idx === compareTreeIndex.value) return
+    if (viewMode.value === 'timeline') {
+      loadCompareTreeByIndex(idx)
+    } else {
+      try {
+        const res = await loadTreeByRootId(rootId)
+        const tree = res!
+        if (!tree.tree || tree.tree.children.length === 0) {
+          compareTreeIndex.value = idx
+          compareTreeFrames.value = []
+          compareFrameIndex.value = 0
+          compareChildPage.value = 0
+          singlePreviewImage.value = tree.rootUrl
+          singlePreviewLabel.value = tree.rootId
+          compareTreeName.value = tree.treeName || ''
+          return
+        }
+        const frames = buildTreeCompareFrames(tree.tree, tree)
+        if (frames.length > 0) {
+          compareTreeIndex.value = idx
+          compareTreeFrames.value = frames
+          compareFrameIndex.value = 0
+          compareChildPage.value = 0
+          compareTreeName.value = tree.treeName || ''
+        }
+      } catch (error) {
+        console.error('外部切换同步比对树失败:', error)
+      }
+    }
   })
 
   function collectTreeNodesFlat(node: TreeNode, list: Node[]): void {
@@ -175,8 +210,9 @@ export function useCompareDialog(
       try {
         const res = await loadTreeByRootId(rootInfo.rootId)
         const tree = res!
+        compareTreeIndex.value = nextIdx
+        compareTreeName.value = tree.treeName || ''
         if (!tree.tree || tree.tree.children.length === 0) {
-          compareTreeIndex.value = nextIdx
           compareTreeFrames.value = []
           compareFrameIndex.value = 0
           compareChildPage.value = 0
@@ -186,7 +222,6 @@ export function useCompareDialog(
         }
         const frames = buildTreeCompareFrames(tree.tree, tree)
         if (frames.length > 0) {
-          compareTreeIndex.value = nextIdx
           compareTreeFrames.value = frames
           compareFrameIndex.value = 0
           compareChildPage.value = 0
@@ -205,8 +240,9 @@ export function useCompareDialog(
       try {
         const res = await loadTreeByRootId(rootInfo.rootId)
         const tree = res!
+        compareTreeIndex.value = prevIdx
+        compareTreeName.value = tree.treeName || ''
         if (!tree.tree || tree.tree.children.length === 0) {
-          compareTreeIndex.value = prevIdx
           compareTreeFrames.value = []
           compareFrameIndex.value = 0
           compareChildPage.value = 0
@@ -216,7 +252,6 @@ export function useCompareDialog(
         }
         const frames = buildTreeCompareFrames(tree.tree, tree)
         if (frames.length > 0) {
-          compareTreeIndex.value = prevIdx
           compareTreeFrames.value = frames
           compareFrameIndex.value = frames.length - 1
           const lastFrame = frames[frames.length - 1]!
@@ -267,6 +302,7 @@ export function useCompareDialog(
       const rootInfo = allTrees.value[idx]!
       const res = await loadTreeByRootId(rootInfo.rootId)
       const tree = res!
+      compareTreeIndex.value = idx
       compareTreeName.value = tree.treeName || ''
       if (!tree.tree) {
         compareTreeFrames.value = []
@@ -287,7 +323,6 @@ export function useCompareDialog(
         compareFrameIndex.value = compareTreeFrames.value.findIndex((f) => f.parent.selfId === node.selfId);
         compareChildPage.value = 0;
         if (!currentFrame.value) {
-          // 没有子节点 直接预览
           compareFrameIndex.value = -1
           compareChildPage.value = 0
           singlePreviewImage.value = node.selfUrl || node.imageUrl

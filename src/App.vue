@@ -16,7 +16,7 @@ const {
   searchKeyword, selectedTreeId, pagedTreeIndex,
   filteredTrees, hasPrevTree, hasNextTree, treeLoading,
   changeSelectedTree,
-  goToPrevTree, goToNextTree, loadTreeData, refreshCurrentTree, loadTreeByRootId
+  goToPrevTree, goToNextTree, loadTreeData, refreshCurrentTree, refreshAllRootIds, loadTreeByRootId, getTreeIndex
 } = useTreeData()
 
 const {
@@ -33,7 +33,7 @@ const {
   gridMode, childPageSize,
   isSingleNodePreview, singlePreviewImage, singlePreviewLabel,
   compareTreeName, compareTreeRootId, updateTreeName,
-} = useCompareDialog(allTrees, viewMode, loadTreeByRootId)
+} = useCompareDialog(allTrees, viewMode, loadTreeByRootId, selectedTreeId)
 
 const goJsTreeRef = ref<any>(null)
 const treeListRef = ref<HTMLDivElement | null>(null)
@@ -97,14 +97,14 @@ function handleGlobalKeydown(e: KeyboardEvent) {
 
 const searchHistoryVisible = ref(false)
 const searchHistorySourceImage = ref('')
-const searchHistorySourceLabel = ref('')
+const searchHistorySourceSelfId = ref('')
 const searchHistoryResults = ref<SearchHistoryItem[]>([])
 const searchHistoryLoading = ref(false)
 
 async function handleSearchHistory(selfId: string) {
   const node = nodes.value.find((n) => n.selfId === selfId)
   searchHistorySourceImage.value = node?.selfUrl || node?.imageUrl || ''
-  searchHistorySourceLabel.value = selfId
+  searchHistorySourceSelfId.value = selfId
   searchHistoryLoading.value = true
   searchHistoryVisible.value = true
   try {
@@ -116,6 +116,12 @@ async function handleSearchHistory(selfId: string) {
   } finally {
     searchHistoryLoading.value = false
   }
+}
+
+async function handleMoveSuccess(newRootId: string) {
+  compareVisible.value = false
+  await refreshAllRootIds()
+  await changeSelectedTree(newRootId)
 }
 
 function scrollTreeListToActive() {
@@ -201,7 +207,7 @@ onBeforeUnmount(() => {
         </div>
         <el-input
           v-model="searchKeyword"
-          placeholder="搜索根节点ID"
+          placeholder="搜索序号或名称"
           clearable
           style="margin-bottom: 10px"
         >
@@ -218,7 +224,9 @@ onBeforeUnmount(() => {
              @click="changeSelectedTree(tree.rootId)"
           >
             <div class="tree-info">
+              <span class="tree-index">{{ getTreeIndex(tree.rootId) + 1 }}.</span>
               <span class="tree-id">{{ tree.treeName ? tree.treeName + '(' + tree.rootId + ')' : tree.rootId }}</span>
+              <span class="tree-id" style="font-size: 10px;">({{ tree.nodeCount }})</span>
             </div>
           </div>
         </div>
@@ -278,8 +286,9 @@ onBeforeUnmount(() => {
     <SearchHistoryDialog
       v-model="searchHistoryVisible"
       :source-image="searchHistorySourceImage"
-      :source-label="searchHistorySourceLabel"
+      :source-self-id="searchHistorySourceSelfId"
       :results="searchHistoryResults"
+      @move-success="handleMoveSuccess"
     />
   </div>
 </template>
@@ -341,6 +350,14 @@ onBeforeUnmount(() => {
 .tree-item.active {
   background: #d0e7ff;
   border: 1px solid #409eff;
+}
+
+.tree-index {
+  font-size: 12px;
+  color: #909399;
+  flex-shrink: 0;
+  margin-right: 2px;
+  min-width: 24px;
 }
 
 .tree-id {
