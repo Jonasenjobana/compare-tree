@@ -1,6 +1,6 @@
 import request from '@/utils/request'
-import type { NodeResponse, TreeResponse } from '@/types'
-import { getMockAllRootIds, getMockTreeByRootId, mockUpdateRootName } from '@/mock/tree-mock'
+import type { NodeResponse, TreeResponse, SearchHistoryResponse } from '@/types'
+import { getMockAllRootIds, getMockTreeByRootId, mockUpdateRootName, mockSearchHistory } from '@/mock/tree-mock'
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 
@@ -41,4 +41,16 @@ export function updateRootName(data: UpdateRootNameRequest): Promise<any> {
     return mockUpdateRootName(data.rootId, data.name)
   }
   return request.post('/update_root_name', data)
+}
+
+export interface SearchHistoryRequest {
+  selfId: string
+  top_k?: number
+}
+
+export function searchHistory(data: SearchHistoryRequest): Promise<SearchHistoryResponse> {
+  if (USE_MOCK) {
+    return mockSearchHistory(data.selfId)
+  }
+  return request.post<SearchHistoryResponse, SearchHistoryResponse>('/search_history', data)
 }

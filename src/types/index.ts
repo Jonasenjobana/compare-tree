@@ -54,3 +54,17 @@ export interface LinkData {
   isModified: boolean
   reviewResult?: string
 }
+
+export interface SearchHistoryItem {
+  name: string
+  score: number
+  url: string
+}
+
+export interface SearchHistoryResponse {
+  success: boolean
+  selfId: string
+  history_size: number
+  top_k: number
+  results: SearchHistoryItem[]
+}

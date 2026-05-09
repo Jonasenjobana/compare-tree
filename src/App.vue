@@ -5,10 +5,11 @@ import { Search, SortUp, SortDown } from '@element-plus/icons-vue'
 import PreviewPanel from '@/components/preview-panel/index.vue'
 import AntVX6 from '@/components/antv-x6-tree/index.vue'
 import CompareDialog from '@/components/compare-dialog/index.vue'
+import SearchHistoryDialog from '@/components/search-history-dialog/index.vue'
 import { useTreeData } from '@/composables/useTreeData'
 import { useCompareDialog } from '@/composables/useCompareDialog'
-import { batchReview, type ReviewRecord } from '@/api/tree'
-import type { Node } from '@/types'
+import { batchReview, searchHistory, type ReviewRecord } from '@/api/tree'
+import type { Node, SearchHistoryItem } from '@/types'
 
 const {
   allTrees, currentTree, nodes, viewMode, timelineOrder,
@@ -92,6 +93,29 @@ function handleGlobalKeydown(e: KeyboardEvent) {
   if (compareVisible.value) return
   if (e.key === 'ArrowLeft') goToPrevTree()
   else if (e.key === 'ArrowRight') goToNextTree()
+}
+
+const searchHistoryVisible = ref(false)
+const searchHistorySourceImage = ref('')
+const searchHistorySourceLabel = ref('')
+const searchHistoryResults = ref<SearchHistoryItem[]>([])
+const searchHistoryLoading = ref(false)
+
+async function handleSearchHistory(selfId: string) {
+  const node = nodes.value.find((n) => n.selfId === selfId)
+  searchHistorySourceImage.value = node?.selfUrl || node?.imageUrl || ''
+  searchHistorySourceLabel.value = selfId
+  searchHistoryLoading.value = true
+  searchHistoryVisible.value = true
+  try {
+    const res = await searchHistory({ selfId, top_k: 9 })
+    searchHistoryResults.value = res.results
+  } catch (error) {
+    console.error('搜索相似图片失败:', error)
+    ElMessage.error('搜索相似图片失败')
+  } finally {
+    searchHistoryLoading.value = false
+  }
 }
 
 function scrollTreeListToActive() {
@@ -248,6 +272,14 @@ onBeforeUnmount(() => {
       @keydown="handleCompareKeydown"
       @submit-review="handleSubmitReview"
       @update-tree-name="updateTreeName"
+      @search-history="handleSearchHistory"
+    />
+
+    <SearchHistoryDialog
+      v-model="searchHistoryVisible"
+      :source-image="searchHistorySourceImage"
+      :source-label="searchHistorySourceLabel"
+      :results="searchHistoryResults"
     />
   </div>
 </template>

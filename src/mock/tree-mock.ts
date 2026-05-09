@@ -1,4 +1,4 @@
-import type { TreeResponse, TreeNode, TreeRoot, NodeResponse } from "@/types";
+import type { TreeResponse, TreeNode, TreeRoot, NodeResponse, SearchHistoryResponse } from "@/types";
 
 const MOCK_IMAGE = "/XZZD15557_2_v0.jpg";
 
@@ -85,6 +85,21 @@ export function mockUpdateRootName(rootId: string, name: string): Promise<{ succ
     root.treeName = name
   }
   return Promise.resolve({ success: true })
+}
+
+export function mockSearchHistory(selfId: string): Promise<SearchHistoryResponse> {
+  const results = Array.from({ length: 10 }, (_, i) => ({
+    name: `MOCK_${selfId}_match_${i + 1}.jpg`,
+    score: Math.round((0.95 - i * 0.03) * 1000000) / 1000000,
+    url: MOCK_IMAGE,
+  }))
+  return Promise.resolve({
+    success: true,
+    selfId,
+    history_size: 12873,
+    top_k: 10,
+    results,
+  })
 }
 
 export function getMockTreeByRootId(rootId: string): Promise<NodeResponse> {

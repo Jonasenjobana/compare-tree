@@ -5,6 +5,9 @@ import type { CompareFrame } from '@/utils/tree-utils'
 import { api as viewerApi } from 'v-viewer'
 import type { ReviewRecord } from '@/api/tree'
 import { Edit } from '@element-plus/icons-vue'
+import ContextMenu from '@/components/context-menu/index.vue'
+import type { ContextMenuItem } from '@/components/context-menu/index.vue'
+import { Search } from '@element-plus/icons-vue'
 
 const isViewerOpen = ref(false)
 
@@ -66,7 +69,22 @@ const emit = defineEmits<{
   'keydown': [e: KeyboardEvent]
   'submit-review': [records: ReviewRecord[]]
   'update-tree-name': [name: string]
+  'search-history': [selfId: string]
 }>()
+
+const contextMenuRef = ref<InstanceType<typeof ContextMenu> | null>(null)
+const contextMenuItems = ref<ContextMenuItem[]>([])
+
+function handleImageContextMenu(e: MouseEvent, selfId: string) {
+  contextMenuItems.value = [
+    {
+      label: '相似图片匹配',
+      icon: Search,
+      handler: () => emit('search-history', selfId),
+    },
+  ]
+  contextMenuRef.value?.show(e.clientX, e.clientY)
+}
 
 const reviewStates = reactive<Record<string, '一致' | '不一致' | undefined>>({})
 
@@ -174,7 +192,7 @@ const gridClass = computed(() => `compare-grid--${props.gridMode}`)
     </div>
     <template v-if="isSingleNodePreview">
       <div class="single-preview">
-        <el-image :src="singlePreviewImage" fit="contain" class="single-preview-image" @dblclick="openImageViewer(singlePreviewImage)">
+        <el-image :src="singlePreviewImage" fit="contain" class="single-preview-image" @dblclick="openImageViewer(singlePreviewImage)" @contextmenu.prevent="handleImageContextMenu($event, singlePreviewLabel)">
           <template #placeholder>
             <div class="compare-image-loading">
               <div class="loading-spinner"></div>
@@ -189,7 +207,7 @@ const gridClass = computed(() => `compare-grid--${props.gridMode}`)
         <div class="compare-grid" :class="gridClass">
           <div class="compare-cell">
             <div class="compare-image-wrapper">
-              <el-image :src="currentFrame.parent.selfUrl" fit="contain" class="compare-image" @dblclick="openImageViewer(currentFrame.parent.selfUrl)">
+              <el-image :src="currentFrame.parent.selfUrl" fit="contain" class="compare-image" @dblclick="openImageViewer(currentFrame.parent.selfUrl)" @contextmenu.prevent="handleImageContextMenu($event, currentFrame.parent.selfId)">
                 <template #placeholder>
                   <div class="compare-image-loading">
                     <div class="loading-spinner"></div>
@@ -207,6 +225,7 @@ const gridClass = computed(() => `compare-grid--${props.gridMode}`)
                   fit="contain"
                   class="compare-image"
                   @dblclick="openImageViewer(currentFrame.children[compareChildPage * childPageSize + i - 1]!.selfUrl)"
+                  @contextmenu.prevent="handleImageContextMenu($event, currentFrame.children[compareChildPage * childPageSize + i - 1]!.selfId)"
                 >
                   <template #placeholder>
                     <div class="compare-image-loading">
@@ -334,7 +353,7 @@ const gridClass = computed(() => `compare-grid--${props.gridMode}`)
         <div class="compare-grid" :class="gridClass">
           <div class="compare-cell">
             <div class="compare-image-wrapper">
-              <el-image :src="compareRootImage" fit="contain" class="compare-image" @dblclick="openImageViewer(compareRootImage)">
+              <el-image :src="compareRootImage" fit="contain" class="compare-image" @dblclick="openImageViewer(compareRootImage)" @contextmenu.prevent="handleImageContextMenu($event, compareRootLabel)">
                 <template #placeholder>
                   <div class="compare-image-loading">
                     <div class="loading-spinner"></div>
@@ -352,6 +371,7 @@ const gridClass = computed(() => `compare-grid--${props.gridMode}`)
                   fit="contain"
                   class="compare-image"
                   @dblclick="openImageViewer(compareTimelineNodes[comparePage * childPageSize + i - 1]?.imageUrl || '')"
+                  @contextmenu.prevent="handleImageContextMenu($event, compareTimelineNodes[comparePage * childPageSize + i - 1]?.selfId || '')"
                 >
                   <template #placeholder>
                     <div class="compare-image-loading">
@@ -410,6 +430,7 @@ const gridClass = computed(() => `compare-grid--${props.gridMode}`)
         </div>
       </div>
     </template>
+    <ContextMenu ref="contextMenuRef" :items="contextMenuItems" />
   </el-dialog>
 </template>
 
