@@ -22,16 +22,16 @@
       </div>
       <div class="info-item">
         <span class="label">匹配时间:</span>
-        <span class="value">{{ selectedNode.matchDate }}</span>
+        <span class="value" style="white-space: wrap; text-align: right;">{{ selectedNode.matchDate }}</span>
       </div>
-      <div class="info-item">
+      <!-- <div class="info-item">
         <span class="label">修改状态:</span>
         <el-tag :type="selectedNode.isModified ? 'warning' : 'info'">
           {{ selectedNode.isModified ? '已手动修改' : '系统匹配' }}
         </el-tag>
-      </div>
+      </div> -->
       <el-divider />
-      <div class="edit-section">
+      <!-- <div class="edit-section">
         <h4>修改父节点</h4>
         <el-select v-model="selectedParentId" placeholder="请选择父节点" style="width: 100%; margin: 8px 0;">
           <el-option v-for="node in availableNodes" :key="node.id" :label="node.selfId" :value="node.id" />
@@ -39,13 +39,13 @@
         <el-button type="primary" style="width: 100%" @click="handleSubmit" :disabled="!selectedParentId || selectedParentId === selectedNode.parentId">
           确认修改
         </el-button>
-      </div>
+      </div> -->
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed, defineProps, defineEmits } from 'vue'
+import { ref, watch, computed } from 'vue'
 import type { Node } from '@/types'
 
 const props = defineProps<{

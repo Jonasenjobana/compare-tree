@@ -9,7 +9,8 @@ export type { CompareFrame }
 
 export function useCompareDialog(
   allTrees: Ref<TreeRoot[]>,
-  viewMode: Ref<'tree' | 'timeline'>
+  viewMode: Ref<'tree' | 'timeline'>,
+  loadTreeByRootId: (rootId: string) => Promise<TreeRoot | null>
 ) {
   const compareVisible = ref(false)
   const compareRootImage = ref('')
@@ -91,8 +92,8 @@ export function useCompareDialog(
     const rootInfo = allTrees.value[index]
     if (!rootInfo) return
     try {
-      const res = await getTreeByRootId(rootInfo.rootId)
-      loadCompareTreeFromData(res.tree, index)
+      const res = await loadTreeByRootId(rootInfo.rootId)
+      loadCompareTreeFromData(res!, index)
     } catch (error) {
       console.error('获取比对树详情失败:', error)
     }
@@ -172,8 +173,8 @@ export function useCompareDialog(
       const rootInfo = allTrees.value[nextIdx]
       if (!rootInfo) return
       try {
-        const res = await getTreeByRootId(rootInfo.rootId)
-        const tree = res.tree
+        const res = await loadTreeByRootId(rootInfo.rootId)
+        const tree = res!
         if (!tree.tree || tree.tree.children.length === 0) {
           compareTreeIndex.value = nextIdx
           compareTreeFrames.value = []
@@ -202,8 +203,8 @@ export function useCompareDialog(
       const rootInfo = allTrees.value[prevIdx]
       if (!rootInfo) return
       try {
-        const res = await getTreeByRootId(rootInfo.rootId)
-        const tree = res.tree
+        const res = await loadTreeByRootId(rootInfo.rootId)
+        const tree = res!
         if (!tree.tree || tree.tree.children.length === 0) {
           compareTreeIndex.value = prevIdx
           compareTreeFrames.value = []
@@ -264,8 +265,8 @@ export function useCompareDialog(
 
     try {
       const rootInfo = allTrees.value[idx]!
-      const res = await getTreeByRootId(rootInfo.rootId)
-      const tree = res.tree
+      const res = await loadTreeByRootId(rootInfo.rootId)
+      const tree = res!
       compareTreeName.value = tree.treeName || ''
       if (!tree.tree) {
         compareTreeFrames.value = []

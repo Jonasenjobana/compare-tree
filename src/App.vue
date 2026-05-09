@@ -15,7 +15,7 @@ const {
   searchKeyword, selectedTreeId, pagedTreeIndex,
   filteredTrees, hasPrevTree, hasNextTree, treeLoading,
   changeSelectedTree,
-  goToPrevTree, goToNextTree, loadTreeData, refreshCurrentTree,
+  goToPrevTree, goToNextTree, loadTreeData, refreshCurrentTree, loadTreeByRootId
 } = useTreeData()
 
 const {
@@ -32,7 +32,7 @@ const {
   gridMode, childPageSize,
   isSingleNodePreview, singlePreviewImage, singlePreviewLabel,
   compareTreeName, compareTreeRootId, updateTreeName,
-} = useCompareDialog(allTrees, viewMode)
+} = useCompareDialog(allTrees, viewMode, loadTreeByRootId)
 
 const goJsTreeRef = ref<any>(null)
 const treeListRef = ref<HTMLDivElement | null>(null)

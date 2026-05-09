@@ -131,5 +131,6 @@ export function useTreeData() {
     goToNextTree,
     loadTreeData,
     refreshCurrentTree,
+    loadTreeByRootId
   }
 }
