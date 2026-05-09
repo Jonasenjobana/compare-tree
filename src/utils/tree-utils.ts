@@ -62,7 +62,7 @@ export function buildTreeCompareFrames(startNode: TreeNode, treeRoot: TreeRoot):
   if (!treeRoot.tree) return []
   const positionMap = buildPositionMap(treeRoot.tree)
   const frames: CompareFrame[] = []
-  const queue: TreeNode[] = [startNode]
+  const queue: TreeNode[] = [treeRoot.tree]
   while (queue.length > 0) {
     const node = queue.shift()!
     if (node.children && node.children.length > 0) {

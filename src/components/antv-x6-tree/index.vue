@@ -666,7 +666,9 @@ const initGraph = () => {
   });
 
   graph.on("translate", () => {
-    updateVisibleImages();
+    if (isLoadInit.value) {
+      updateVisibleImages();
+    }
     clampTranslation();
   });
 
@@ -678,10 +680,10 @@ const initGraph = () => {
     updateVisibleImages();
   });
 };
-
+const isLoadInit = ref(false)
 const loadData = async () => {
   if (!graph || !props.nodes.length) return;
-
+  isLoadInit.value = false;
   const version = ++loadDataVersion;
   loadedNodeIds.clear();
 
@@ -709,17 +711,13 @@ const loadData = async () => {
     if (treeRoot) {
       locateNode(`label-${treeRoot.rootId}`);
     }
-    setTimeout(() => updateVisibleImages(), 500);
+    isLoadInit.value = true;
+    updateVisibleImages();
     return;
   }
 
   const trees = splitTrees(props.nodes);
-  const treeResults = await new Promise((resolve) => {
-    setTimeout(async () => {
-      const res = await Promise.all(trees.map((treeNodes) => layoutTree(treeNodes)));
-      resolve(res);
-    }, 500);
-  }) as any[];
+  const treeResults = await Promise.all(trees.map((treeNodes) => layoutTree(treeNodes)));
 
   if (version !== loadDataVersion) return;
   const allCellNodes: any[] = [];
@@ -758,7 +756,7 @@ const loadData = async () => {
       graph.centerCell(cell);
     }
   }
-  setTimeout(() => updateVisibleImages(), 500);
+  setTimeout(() => updateVisibleImages(), 200);
 };
 
 onMounted(() => {

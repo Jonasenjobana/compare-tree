@@ -17,16 +17,18 @@ export function useCompareDialog(
   const compareTimelineNodes = ref<Node[]>([])
   const comparePage = ref(0)
   const compareTreeIndex = ref(0)
-
+  // 扁平化后的树节点 保证遍历顺序
   const compareTreeFrames = ref<CompareFrame[]>([])
+  // 帧
   const compareFrameIndex = ref(0)
+  // 页
   const compareChildPage = ref(0)
 
   const gridMode = ref<'2' | '4'>('4')
   const childPageSize = computed(() => gridMode.value === '2' ? 1 : 3)
   const singlePreviewImage = ref('')
   const singlePreviewLabel = ref('')
-  const isSingleNodePreview = computed(() => viewMode.value === 'tree' && compareTreeFrames.value.length === 0 && compareVisible.value)
+  const isSingleNodePreview = computed(() => viewMode.value === 'tree' && !currentFrame.value)
 
   const compareTreeName = ref('')
   const compareTreeRootId = computed(() => {
@@ -159,7 +161,11 @@ export function useCompareDialog(
       compareChildPage.value = Math.max(0, Math.ceil(prevFrame.children.length / childPageSize.value) - 1)
     }
   }
-
+  /**
+   * 切换到下一棵树
+   * 调取接口
+   * TODO 同步到画布antx6
+   */
   async function nextCompareTree() {
     if (compareTreeIndex.value < allTrees.value.length - 1) {
       const nextIdx = compareTreeIndex.value + 1
@@ -277,11 +283,11 @@ export function useCompareDialog(
         const startNode = findTreeNodeById(tree.tree, node.id)
         if (!startNode) return
         compareTreeFrames.value = buildTreeCompareFrames(startNode, tree)
-        if (compareTreeFrames.value.length > 0) {
-          compareFrameIndex.value = 0
-          compareChildPage.value = 0
-        } else {
-          compareFrameIndex.value = 0
+        compareFrameIndex.value = compareTreeFrames.value.findIndex((f) => f.parent.selfId === node.selfId);
+        compareChildPage.value = 0;
+        if (!currentFrame.value) {
+          // 没有子节点 直接预览
+          compareFrameIndex.value = -1
           compareChildPage.value = 0
           singlePreviewImage.value = node.selfUrl || node.imageUrl
           singlePreviewLabel.value = node.selfId
