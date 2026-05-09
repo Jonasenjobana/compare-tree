@@ -254,18 +254,18 @@ const gridClass = computed(() => `compare-grid--${props.gridMode}`)
                 </div>
                 <div
                   v-if="gridMode === '2'"
-                  class="review-buttons review-buttons--bottom"
+                  class="review-bar"
                 >
                   <button
-                    class="review-btn review-btn--pass"
+                    class="review-btn-lg review-btn-lg--pass"
                     :class="{ active: getReviewState(compareChildPage * childPageSize + i - 1) === '一致' }"
                     @click="setReviewState(compareChildPage * childPageSize + i - 1, '一致')"
-                  >✔</button>
+                  >✔ 一致</button>
                   <button
-                    class="review-btn review-btn--fail"
+                    class="review-btn-lg review-btn-lg--fail"
                     :class="{ active: getReviewState(compareChildPage * childPageSize + i - 1) === '不一致' }"
                     @click="setReviewState(compareChildPage * childPageSize + i - 1, '不一致')"
-                  >✘</button>
+                  >✘ 不一致</button>
                 </div>
                 <div
                   v-if="gridMode === '2'"
@@ -599,18 +599,63 @@ const gridClass = computed(() => `compare-grid--${props.gridMode}`)
   z-index: 10;
 }
 
-.review-buttons--bottom {
-  top: auto;
-  right: 50%;
-  transform: translateX(50%);
-  bottom: 6px;
-  gap: 20px;
+.review-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 16px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.45));
+  z-index: 10;
 }
 
-.review-buttons--bottom .review-btn {
-  width: 120px;
-  height: 120px;
-  font-size: 48px;
+.review-btn-lg {
+  padding: 8px 20px;
+  border-radius: 20px;
+  border: 2px solid rgba(255, 255, 255, 0.6);
+  background: rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s;
+  line-height: 1;
+  letter-spacing: 1px;
+}
+
+.review-btn-lg--pass {
+  color: #95d475;
+}
+
+.review-btn-lg--fail {
+  color: #f89898;
+}
+
+.review-btn-lg--pass.active {
+  background: #67c23a;
+  border-color: #67c23a;
+  color: #fff;
+  transform: scale(1.08);
+  box-shadow: 0 2px 16px rgba(103, 194, 58, 0.55);
+}
+
+.review-btn-lg--fail.active {
+  background: #f56c6c;
+  border-color: #f56c6c;
+  color: #fff;
+  transform: scale(1.08);
+  box-shadow: 0 2px 16px rgba(245, 108, 108, 0.55);
+}
+
+.review-btn-lg:hover {
+  border-color: #fff;
+  background: rgba(0, 0, 0, 0.55);
 }
 
 .cell-corner-group {

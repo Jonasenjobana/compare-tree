@@ -25,7 +25,7 @@ export function useCompareDialog(
   // 页
   const compareChildPage = ref(0)
 
-  const gridMode = ref<'2' | '4'>('4')
+  const gridMode = ref<'2' | '4'>('2')
   const childPageSize = computed(() => gridMode.value === '2' ? 1 : 3)
   const singlePreviewImage = ref('')
   const singlePreviewLabel = ref('')
