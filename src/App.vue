@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Search, SortUp, SortDown } from '@element-plus/icons-vue'
+import { Search, SortUp, SortDown, Filter } from '@element-plus/icons-vue'
 import PreviewPanel from '@/components/preview-panel/index.vue'
 import AntVX6 from '@/components/antv-x6-tree/index.vue'
 import CompareDialog from '@/components/compare-dialog/index.vue'
@@ -15,7 +15,7 @@ import type { Node, SearchHistoryItem } from '@/types'
 
 const {
   allTrees, currentTree, nodes, viewMode, timelineOrder,
-  searchKeyword, selectedTreeId, pagedTreeIndex,
+  searchKeyword, maxNodeCount, selectedTreeId, pagedTreeIndex,
   filteredTrees, hasPrevTree, hasNextTree, treeLoading,
   changeSelectedTree,
   goToPrevTree, goToNextTree, loadTreeData, refreshCurrentTree, refreshAllRootIds, loadTreeByRootId, getTreeIndex
@@ -230,16 +230,38 @@ onBeforeUnmount(() => {
             {{ timelineOrder === 'asc' ? '正序' : '倒序' }}
           </el-button>
         </div>
-        <el-input
-          v-model="searchKeyword"
-          placeholder="搜索序号或名称"
-          clearable
-          style="margin-bottom: 10px"
-        >
-          <template #prefix>
-            <el-icon><Search /></el-icon>
-          </template>
-        </el-input>
+        <div class="search-row">
+          <el-input
+            v-model="searchKeyword"
+            placeholder="搜索序号或名称"
+            clearable
+          >
+            <template #prefix>
+              <el-icon><Search /></el-icon>
+            </template>
+          </el-input>
+          <el-popover placement="bottom" :width="200" trigger="click">
+            <template #reference>
+              <el-button
+                size="small"
+                :type="maxNodeCount !== undefined && maxNodeCount !== null ? 'primary' : 'default'"
+                :icon="Filter"
+              />
+            </template>
+            <div class="filter-popover-content">
+              <span class="filter-label">节点数</span>
+              <el-input-number
+                v-model="maxNodeCount"
+                :min="1"
+                controls-position="right"
+                placeholder="不限制"
+                clearable
+                size="small"
+                style="width: 120px"
+              />
+            </div>
+          </el-popover>
+        </div>
         <div ref="treeListRef" class="tree-list">
           <div
             v-for="tree in filteredTrees"
@@ -354,6 +376,29 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 8px;
   margin-bottom: 10px;
+}
+
+.search-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.search-row .el-input {
+  flex: 1;
+}
+
+.filter-popover-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-label {
+  font-size: 13px;
+  color: #606266;
+  white-space: nowrap;
 }
 
 .tree-list {

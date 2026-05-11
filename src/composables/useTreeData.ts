@@ -10,6 +10,7 @@ export function useTreeData() {
   const viewMode = ref<'tree' | 'timeline'>('tree')
   const timelineOrder = ref<'asc' | 'desc'>('asc')
   const searchKeyword = ref('')
+  const maxNodeCount = ref<number | undefined>(undefined)
   const selectedTreeId = ref('')
   const pagedTreeIndex = ref(0)
   const treeLoading = ref(false)
@@ -40,20 +41,28 @@ export function useTreeData() {
   }
 
   const filteredTrees = computed(() => {
-    if (!searchKeyword.value) return allTrees.value
-    const kw = searchKeyword.value.toLowerCase()
-    const isIndex = /^\d+$/.test(kw)
-    if (isIndex) {
-      const idx = parseInt(kw, 10) - 1
-      if (idx >= 0 && idx < allTrees.value.length) {
-        return [allTrees.value[idx]!]
+    let result = allTrees.value
+    if (searchKeyword.value) {
+      const kw = searchKeyword.value.toLowerCase()
+      const isIndex = /^\d+$/.test(kw)
+      if (isIndex) {
+        const idx = parseInt(kw, 10) - 1
+        if (idx >= 0 && idx < allTrees.value.length) {
+          result = [allTrees.value[idx]!]
+        } else {
+          result = []
+        }
+      } else {
+        result = allTrees.value.filter((tree) =>
+          tree.rootId.toLowerCase().includes(kw) ||
+          (tree.treeName && tree.treeName.toLowerCase().includes(kw))
+        )
       }
-      return []
     }
-    return allTrees.value.filter((tree) =>
-      tree.rootId.toLowerCase().includes(kw) ||
-      (tree.treeName && tree.treeName.toLowerCase().includes(kw))
-    )
+    if (maxNodeCount.value !== undefined && maxNodeCount.value !== null) {
+      result = result.filter((tree) => tree.nodeCount == maxNodeCount.value!)
+    }
+    return result
   })
 
   function getTreeIndex(rootId: string): number {
@@ -143,6 +152,7 @@ export function useTreeData() {
     viewMode,
     timelineOrder,
     searchKeyword,
+    maxNodeCount,
     selectedTreeId,
     pagedTreeIndex,
     filteredTrees,
