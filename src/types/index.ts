@@ -21,7 +21,10 @@ export interface TreeRoot {
   tree?: TreeNode
   treeName: string
   maxMatchDate: string
+  totalChildCount: number
+  completedCount: string
   nodeCount: number
+  isCompleted: boolean
 }
 
 export interface TreeResponse {
