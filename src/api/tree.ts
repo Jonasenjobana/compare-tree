@@ -61,11 +61,7 @@ export interface MoveTreeNodeRequest {
   score: number
 }
 
-export interface MoveTreeNodeResponse {
-  selfId: string
-  rootId: string
-}
 
-export function moveTreeNode(data: MoveTreeNodeRequest): Promise<MoveTreeNodeResponse> {
-  return request.post<MoveTreeNodeResponse, MoveTreeNodeResponse>('/move_tree_node', data)
+export function moveTreeNode(data: MoveTreeNodeRequest): Promise<void> {
+  return request.post<void, void>('/move_tree_node', data)
 }

@@ -6,6 +6,8 @@ import PreviewPanel from '@/components/preview-panel/index.vue'
 import AntVX6 from '@/components/antv-x6-tree/index.vue'
 import CompareDialog from '@/components/compare-dialog/index.vue'
 import SearchHistoryDialog from '@/components/search-history-dialog/index.vue'
+import ContextMenu from '@/components/context-menu/index.vue'
+import type { ContextMenuItem } from '@/components/context-menu/index.vue'
 import { useTreeData } from '@/composables/useTreeData'
 import { useCompareDialog } from '@/composables/useCompareDialog'
 import { batchReview, searchHistory, type ReviewRecord } from '@/api/tree'
@@ -39,6 +41,8 @@ const goJsTreeRef = ref<any>(null)
 const treeListRef = ref<HTMLDivElement | null>(null)
 const focusNodeId = ref('')
 const selectedNode = ref<Node | null>(null)
+const contextMenuRef = ref<InstanceType<typeof ContextMenu> | null>(null)
+const contextMenuItems = ref<ContextMenuItem[]>([])
 
 function locateToRoot(rootId: string) {
   if (goJsTreeRef.value) {
@@ -49,6 +53,17 @@ function locateToRoot(rootId: string) {
 const handleNodeSelect = (node: Node) => {
   selectedNode.value = node
   focusNodeId.value = node.id
+}
+
+function handleNodeContextMenu(node: Node, e: MouseEvent) {
+  contextMenuItems.value = [
+    {
+      label: '相似图片匹配',
+      icon: Search,
+      handler: () => handleSearchHistory(node.selfId),
+    },
+  ]
+  contextMenuRef.value?.show(e.clientX, e.clientY)
 }
 const handleEdgeClick = (node: Node) => {
   const {parentId} = node;
@@ -98,17 +113,22 @@ function handleGlobalKeydown(e: KeyboardEvent) {
 const searchHistoryVisible = ref(false)
 const searchHistorySourceImage = ref('')
 const searchHistorySourceSelfId = ref('')
+const searchHistoryRootId = ref('')
 const searchHistoryResults = ref<SearchHistoryItem[]>([])
 const searchHistoryLoading = ref(false)
-
+const searchCount = ref(9)
+watch(searchCount, (newCount) => {
+  handleSearchHistory(searchHistorySourceSelfId.value)
+})
 async function handleSearchHistory(selfId: string) {
   const node = nodes.value.find((n) => n.selfId === selfId)
   searchHistorySourceImage.value = node?.selfUrl || node?.imageUrl || ''
   searchHistorySourceSelfId.value = selfId
+  searchHistoryRootId.value = node?.rootId || ''
   searchHistoryLoading.value = true
   searchHistoryVisible.value = true
   try {
-    const res = await searchHistory({ selfId, top_k: 9 })
+    const res = await searchHistory({ selfId, top_k: searchCount.value })
     searchHistoryResults.value = res.results
   } catch (error) {
     console.error('搜索相似图片失败:', error)
@@ -118,10 +138,14 @@ async function handleSearchHistory(selfId: string) {
   }
 }
 
-async function handleMoveSuccess(newRootId: string) {
+async function handleMoveSuccess(newRootId: string | null) {
   compareVisible.value = false
   await refreshAllRootIds()
-  await changeSelectedTree(newRootId)
+  if (newRootId) {
+    await changeSelectedTree(newRootId)
+  } else {
+    await refreshCurrentTree()
+  }
 }
 
 function scrollTreeListToActive() {
@@ -178,6 +202,7 @@ onBeforeUnmount(() => {
         @edge-click="handleEdgeClick"
         @node-select="handleNodeSelect"
         @node-double-click="handleNodeDoubleClick"
+        @node-context-menu="handleNodeContextMenu"
       />
       <div class="paged-controls">
         <el-button size="small" :disabled="!hasPrevTree" @click="goToPrevTree">
@@ -287,9 +312,14 @@ onBeforeUnmount(() => {
       v-model="searchHistoryVisible"
       :source-image="searchHistorySourceImage"
       :source-self-id="searchHistorySourceSelfId"
+      :root-id="searchHistoryRootId"
       :results="searchHistoryResults"
+      :count="searchHistoryResults.length"
+      @update:count="searchCount = $event"
       @move-success="handleMoveSuccess"
     />
+
+    <ContextMenu ref="contextMenuRef" :items="contextMenuItems" />
   </div>
 </template>
 

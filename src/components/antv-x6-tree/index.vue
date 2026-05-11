@@ -30,6 +30,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   nodeSelect: [node: Node];
   nodeDoubleClick: [node: Node];
+  nodeContextMenu: [node: Node, e: MouseEvent];
   scaleChange: [scale: number];
   edgeClick: [node: Node];
 }>();
@@ -641,6 +642,12 @@ const initGraph = () => {
   graph.on("node:dblclick", ({ node }) => {
     const data = node.getData() as NodeData;
     if (data && !data._isLabel) emit("nodeDoubleClick", data);
+  });
+
+  graph.on("node:contextmenu", ({ node, e }) => {
+    e.preventDefault();
+    const data = node.getData() as NodeData;
+    if (data && !data._isLabel) emit("nodeContextMenu", data, e as MouseEvent);
   });
 
   graph.on("edge:click", ({ edge }) => {

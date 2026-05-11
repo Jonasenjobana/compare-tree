@@ -9,17 +9,21 @@ const props = defineProps<{
   modelValue: boolean
   sourceImage: string
   sourceSelfId: string
+  rootId: string
+  count: number
   results: SearchHistoryItem[]
 }>()
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
-  'move-success': [rootId: string]
+  'update:count': [value: number]
+  'move-success': [newRootId: string | null]
 }>()
 
 const selectedName = ref<string | null>(null)
 const selectedUrl = ref('')
 const selectedScore = ref(0)
+const selectedHistory = ref<SearchHistoryItem | null>(null)
 const submitting = ref(false)
 const page = ref(0)
 const pageSize = 1
@@ -38,10 +42,12 @@ function selectItem(item: SearchHistoryItem) {
     selectedName.value = null
     selectedUrl.value = ''
     selectedScore.value = 0
+    selectedHistory.value = null
   } else {
     selectedName.value = item.name
     selectedUrl.value = item.url
     selectedScore.value = item.score
+    selectedHistory.value = item
   }
 }
 
@@ -58,7 +64,7 @@ function openImageViewer(url: string) {
 async function confirmMove() {
   let parentId = null
   let score = 100
-
+  const { rootId, selfId } = currentItem.value || {}
   if (selectedName.value) {
     const splitName = selectedName.value.split('_')
     parentId = splitName.slice(0, 2).join('_')
@@ -81,10 +87,9 @@ async function confirmMove() {
 
   submitting.value = true
   try {
-    const res = await moveTreeNode({ selfId: props.sourceSelfId, parentId, score })
-    const newRootId = res.rootId || props.sourceSelfId
+    await moveTreeNode({ selfId: props.sourceSelfId, parentId, score })
     ElMessage.success('节点移动成功')
-    emit('move-success', newRootId)
+    emit('move-success', props.rootId == props.sourceSelfId ? rootId! : props.rootId)
     emit('update:modelValue', false)
   } catch (error) {
     console.error('节点移动失败:', error)
@@ -106,6 +111,17 @@ watch(() => props.modelValue, (val) => {
 watch(() => props.results, () => {
   page.value = 0
 })
+
+function pageChange(flag: boolean) {
+  selectedName.value = null;
+  selectedHistory.value = null;
+  if (flag) {
+    page.value++
+  } else {
+    page.value--
+  }
+}
+
 </script>
 
 <template>
@@ -154,9 +170,10 @@ watch(() => props.results, () => {
     </div>
 
     <div class="bottom-bar">
-      <el-button size="small" :disabled="page === 0" @click="selectedName = null;page--">上一页</el-button>
+      <el-input-number v-model="props.count" :min="1" @change="emit('update:count', $event)" />
+      <el-button size="small" :disabled="page === 0" @click="pageChange(false)">上一页</el-button>
       <span class="page-info">{{ page + 1 }} / {{ maxPage }}</span>
-      <el-button size="small" :disabled="isLastPage" @click="selectedName = null;page++">下一页</el-button>
+      <el-button size="small" :disabled="isLastPage" @click="pageChange(true)">下一页</el-button>
       <el-button
         size="small"
         type="primary"

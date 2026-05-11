@@ -60,6 +60,8 @@ export interface SearchHistoryItem {
   name: string
   score: number
   url: string
+  rootId: string
+  selfId: string
 }
 
 export interface SearchHistoryResponse {
