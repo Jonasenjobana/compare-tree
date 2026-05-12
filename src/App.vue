@@ -217,11 +217,11 @@ onBeforeUnmount(() => {
               <el-icon><Search /></el-icon>
             </template>
           </el-input>
-          <el-popover placement="bottom" :width="220" trigger="click">
+          <el-popover placement="bottom" :width="320" trigger="click">
             <template #reference>
               <el-button
                 size="small"
-                :type="(treeStore.maxNodeCount !== undefined && treeStore.maxNodeCount !== null) || treeStore.filterCompleted !== 'all' ? 'primary' : 'default'"
+                :type="treeStore.nodeCountFilterActive || treeStore.filterCompleted !== 'all' ? 'primary' : 'default'"
                 :icon="Filter"
               />
             </template>
@@ -233,17 +233,50 @@ onBeforeUnmount(() => {
                 <el-radio-button value="pending">未完成</el-radio-button>
               </el-radio-group>
             </div>
-            <div class="filter-popover-content" style="margin-top: 8px">
+            <div class="filter-popover-content node-count-range" style="margin-top: 8px">
               <span class="filter-label">节点数</span>
-              <el-input-number
-                v-model="treeStore.maxNodeCount"
-                :min="1"
-                controls-position="right"
-                placeholder="不限制"
-                clearable
-                size="small"
-                style="width: 120px"
-              />
+              <div class="node-count-range-content">
+                <div class="range-row">
+                  <el-input-number
+                    v-model="treeStore.nodeCountFilter.min"
+                    :min="1"
+                    controls-position="right"
+                    placeholder="最小"
+                    clearable
+                    size="small"
+                    class="range-input"
+                  />
+                  <el-button
+                    text
+                    size="small"
+                    class="op-btn"
+                    @click="treeStore.nodeCountFilter.minOp = treeStore.nodeCountFilter.minOp === 'le' ? 'lt' : 'le'"
+                  >
+                    {{ treeStore.nodeCountFilter.minOp === 'le' ? '≤' : '<' }}
+                  </el-button>
+                  <span class="range-n">n</span>
+                  <el-button
+                    text
+                    size="small"
+                    class="op-btn"
+                    @click="treeStore.nodeCountFilter.maxOp = treeStore.nodeCountFilter.maxOp === 'le' ? 'lt' : 'le'"
+                  >
+                    {{ treeStore.nodeCountFilter.maxOp === 'le' ? '≤' : '<' }}
+                  </el-button>
+                  <el-input-number
+                    v-model="treeStore.nodeCountFilter.max"
+                    :min="1"
+                    controls-position="right"
+                    placeholder="最大"
+                    clearable
+                    size="small"
+                    class="range-input"
+                  />
+                </div>
+                <div v-if="treeStore.nodeCountFilterError" class="range-error">
+                  {{ treeStore.nodeCountFilterError }}
+                </div>
+              </div>
             </div>
           </el-popover>
         </div>
@@ -348,6 +381,47 @@ onBeforeUnmount(() => {
   font-size: 13px;
   color: #606266;
   white-space: nowrap;
+}
+
+.node-count-range {
+  align-items: flex-start;
+  flex-direction: column;
+}
+
+.node-count-range-content {
+  width: 100%;
+}
+
+.range-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.op-btn {
+  padding: 4px 6px !important;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--el-text-color-primary) !important;
+  min-width: 24px;
+}
+
+.range-n {
+  font-size: 13px;
+  font-style: italic;
+  color: var(--el-text-color-secondary);
+  min-width: 14px;
+  text-align: center;
+}
+
+.range-input {
+  width: 100px !important;
+}
+
+.range-error {
+  font-size: 11px;
+  color: var(--el-color-danger);
+  margin-top: 2px;
 }
 
 .tree-list {

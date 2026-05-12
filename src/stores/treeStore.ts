@@ -22,6 +22,15 @@ function convertTreeNodeToList(node: TreeNode, list: Node[]) {
   }
 }
 
+type CompareOp = 'le' | 'lt'
+
+interface NodeCountFilter {
+  min: number | undefined
+  max: number | undefined
+  minOp: CompareOp
+  maxOp: CompareOp
+}
+
 export const useTreeStore = defineStore('tree', () => {
   const allTrees = ref<TreeRoot[]>([])
   const currentTree = ref<TreeRoot | null>(null)
@@ -29,7 +38,12 @@ export const useTreeStore = defineStore('tree', () => {
   const viewMode = ref<'tree' | 'timeline'>('tree')
   const timelineOrder = ref<'asc' | 'desc'>('asc')
   const searchKeyword = ref('')
-  const maxNodeCount = ref<number | undefined>(undefined)
+  const nodeCountFilter = ref<NodeCountFilter>({
+    min: undefined,
+    max: undefined,
+    minOp: 'le',
+    maxOp: 'le',
+  })
   const filterCompleted = ref<'all' | 'completed' | 'pending'>('all')
   const selectedTreeId = ref('')
   const pagedTreeIndex = ref(0)
@@ -56,8 +70,14 @@ export const useTreeStore = defineStore('tree', () => {
         )
       }
     }
-    if (maxNodeCount.value !== undefined && maxNodeCount.value !== null) {
-      result = result.filter((tree) => tree.nodeCount <= maxNodeCount.value!)
+    const { min, max, minOp, maxOp } = nodeCountFilter.value
+    if (min !== undefined || max !== undefined) {
+      result = result.filter((tree) => {
+        const count = tree.nodeCount
+        const minOk = min === undefined || (minOp === 'le' ? count >= min : count > min)
+        const maxOk = max === undefined || (maxOp === 'le' ? count <= max : count < max)
+        return minOk && maxOk
+      })
     }
     if (filterCompleted.value !== 'all') {
       result = result.filter((tree) =>
@@ -71,6 +91,22 @@ export const useTreeStore = defineStore('tree', () => {
 
   const hasPrevTree = computed(() => pagedTreeIndex.value > 0)
   const hasNextTree = computed(() => pagedTreeIndex.value < filteredTrees.value.length - 1)
+
+  const nodeCountFilterActive = computed(() => {
+    const f = nodeCountFilter.value
+    return f.min !== undefined || f.max !== undefined
+  })
+
+  const nodeCountFilterError = computed(() => {
+    const { min, max, minOp, maxOp } = nodeCountFilter.value
+    if (min === undefined || max === undefined) return null
+    const effectiveMin = minOp === 'lt' ? min + 1 : min
+    const effectiveMax = maxOp === 'lt' ? max - 1 : max
+    if (effectiveMin > effectiveMax) {
+      return `范围无效：${minOp === 'lt' ? '<' : '≤'}${min} 与 ${maxOp === 'lt' ? '<' : '≤'}${max} 无交集`
+    }
+    return null
+  })
 
   function getTreeIndex(rootId: string): number {
     return allTrees.value.findIndex((t) => t.rootId === rootId)
@@ -168,7 +204,9 @@ export const useTreeStore = defineStore('tree', () => {
     viewMode,
     timelineOrder,
     searchKeyword,
-    maxNodeCount,
+    nodeCountFilter,
+    nodeCountFilterActive,
+    nodeCountFilterError,
     filterCompleted,
     selectedTreeId,
     pagedTreeIndex,
