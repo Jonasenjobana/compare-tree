@@ -398,8 +398,7 @@ const gridClass = computed(() => `compare-grid--${compareStore.gridMode}`)
     <ContextMenu ref="contextMenuRef" :items="contextMenuItems" />
   </el-dialog>
 </template>
-
-<style scoped>
+<style>
 .el-dialog__body {
   padding: 0 !important;
   display: flex;
@@ -407,6 +406,9 @@ const gridClass = computed(() => `compare-grid--${compareStore.gridMode}`)
   height: calc(100% - 44px);
   overflow: hidden;
 }
+</style>
+<style scoped>
+
 
 .tree-name-bar {
   display: flex;
@@ -515,7 +517,6 @@ const gridClass = computed(() => `compare-grid--${compareStore.gridMode}`)
 
 .compare-cell {
   position: relative;
-  overflow: hidden;
   background: #fff;
   min-height: 0;
 }
@@ -582,7 +583,6 @@ const gridClass = computed(() => `compare-grid--${compareStore.gridMode}`)
   align-items: center;
   gap: 16px;
   padding: 10px 16px;
-  background: linear-gradient(transparent, rgba(0, 0, 0, 0.45));
   z-index: 10;
 }
 
@@ -671,8 +671,9 @@ const gridClass = computed(() => `compare-grid--${compareStore.gridMode}`)
 
 .score-badge--2 {
   position: absolute;
-  top: 6px;
-  left: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  left: 0;
   background: rgba(0, 0, 0, 0.5);
   color: #ddd;
   padding: 2px 6px;
