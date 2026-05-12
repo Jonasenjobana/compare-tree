@@ -672,7 +672,7 @@ const gridClass = computed(() => `compare-grid--${compareStore.gridMode}`)
 .score-badge--2 {
   position: absolute;
   top: 50%;
-  transform: translateY(-50%);
+  transform: translateX(-50%);
   left: 0;
   background: rgba(0, 0, 0, 0.5);
   color: #ddd;
