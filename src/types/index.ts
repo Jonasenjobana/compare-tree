@@ -49,6 +49,7 @@ export interface Node {
   rootId: string
   isModified?: boolean
   reviewResult?: string
+  intelligentRecommend?: string
 }
 
 export interface LinkData {
@@ -57,6 +58,7 @@ export interface LinkData {
   score: number
   isModified: boolean
   reviewResult?: string
+  intelligentRecommend?: string
 }
 
 export interface SearchHistoryItem {

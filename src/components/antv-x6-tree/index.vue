@@ -105,7 +105,9 @@ function splitTrees(nodes: Node[]): Node[][] {
 async function layoutTree(treeNodes: Node[]): Promise<{ nodes: any[]; edges: any[]; minY: number; maxY: number }> {
   const nodeDataMap = new Map<string, Node>();
   treeNodes.forEach((n) => nodeDataMap.set(n.id, n));
-
+const a = treeNodes
+    .filter((n) => n.parentId && nodeDataMap.has(n.parentId))
+  console.log("🚀 ~ layoutTree ~ a:", a)
   const linkDataArray: LinkData[] = treeNodes
     .filter((n) => n.parentId && nodeDataMap.has(n.parentId))
     .map((n) => ({
@@ -114,6 +116,7 @@ async function layoutTree(treeNodes: Node[]): Promise<{ nodes: any[]; edges: any
       score: n.score,
       isModified: n.isModified || false,
       reviewResult: n.reviewResult,
+      intelligentRecommend: n.intelligentRecommend
     }));
 
   const layoutNodes = treeNodes.map((n) => ({
@@ -182,9 +185,10 @@ async function layoutTree(treeNodes: Node[]): Promise<{ nodes: any[]; edges: any
     const score = l.score ?? 0;
     const isModified = l.isModified ?? false;
     const reviewResult = l.reviewResult;
-    const lineColor = getLineColor(score, isModified, reviewResult);
+    const intelligentRecommend = l.intelligentRecommend;
+    const lineColor = getLineColor(score, isModified, reviewResult, intelligentRecommend);
     const lineWidth = getLineWidth(score);
-    const edgeLabel = getEdgeLabel(score, reviewResult);
+    const edgeLabel = getEdgeLabel(score, reviewResult, intelligentRecommend);
     const edgeId = `${l.from}-${l.to}`;
 
     const parentPos = nodePositionMap.get(l.from);
@@ -233,7 +237,7 @@ async function layoutTree(treeNodes: Node[]): Promise<{ nodes: any[]; edges: any
           attrs: {
             label: {
               text: edgeLabel,
-              fill: reviewResult === '不一致' ? "#ff0000" : reviewResult === '一致' ? "#67c23a" : "#333",
+              fill: reviewResult ? reviewResult === '不一致' ? "#ff0000" : '#67c23a' : intelligentRecommend ? intelligentRecommend === '一致' ? "#67c23a" : "#ff0000" : '#333',
               fontSize: 12,
             },
             rect: {
@@ -644,7 +648,7 @@ const initGraph = () => {
     if (data && !data._isLabel) emit("nodeDoubleClick", data);
   });
 
-  graph.on("node:contextmenu", ({ node, e }) => {
+  graph.on("node:contextmenu", ({ node, e }: any) => {
     e.preventDefault();
     const data = node.getData() as NodeData;
     if (data && !data._isLabel) emit("nodeContextMenu", data, e as MouseEvent);

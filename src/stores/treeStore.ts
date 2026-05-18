@@ -15,6 +15,7 @@ function convertTreeNodeToList(node: TreeNode, list: Node[]) {
     rootId: node.rootId,
     selfUrl: node.selfUrl,
     reviewResult: node.reviewResult,
+    intelligentRecommend: node.intelligentRecommend,
   }
   list.push(convertedNode)
   if (node.children && node.children.length > 0) {
