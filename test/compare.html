@@ -1,0 +1,1351 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>船舶比对工具</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, 'Segoe UI', sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            min-height: 100vh;
+            padding: 24px;
+        }
+        .container { max-width: 1280px; margin: 0 auto; }
+
+        h1 {
+            font-size: 24px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        h1 small { font-size: 14px; color: #94a3b8; font-weight: normal; }
+
+        /* 模式切换 */
+        .mode-toggle {
+            display: flex;
+            gap: 0;
+            margin-bottom: 24px;
+            background: #1e293b;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid #334155;
+            width: fit-content;
+        }
+        .mode-toggle button {
+            padding: 8px 20px;
+            border: none;
+            background: transparent;
+            color: #94a3b8;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all .2s;
+        }
+        .mode-toggle button.active {
+            background: #3b82f6;
+            color: #fff;
+        }
+        .mode-toggle button:not(.active):hover {
+            color: #e2e8f0;
+            background: #334155;
+        }
+
+        .full-mode, .chat-mode { display: none; }
+        .full-mode.active, .chat-mode.active { display: block; }
+
+        /* 聊天界面 */
+        .chat-mode {
+            background: #1e293b;
+            border-radius: 10px;
+            border: 1px solid #334155;
+            display: none;
+            flex-direction: column;
+            height: 70vh;
+            min-height: 500px;
+        }
+        .chat-mode.active { display: flex; }
+        .chat-header {
+            padding: 12px 20px;
+            border-bottom: 1px solid #334155;
+            font-size: 15px;
+            color: #94a3b8;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .chat-messages .msg {
+            max-width: 80%;
+            padding: 10px 16px;
+            border-radius: 10px;
+            font-size: 14px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .chat-messages .msg.user {
+            align-self: flex-end;
+            background: #3b82f6;
+            color: #fff;
+            border-bottom-right-radius: 2px;
+        }
+        .chat-messages .msg.assistant {
+            align-self: flex-start;
+            background: #0f172a;
+            color: #e2e8f0;
+            border-bottom-left-radius: 2px;
+        }
+        .chat-messages .msg.system {
+            align-self: center;
+            background: transparent;
+            color: #64748b;
+            font-size: 12px;
+            padding: 4px 12px;
+        }
+        .chat-messages .msg.loading {
+            align-self: flex-start;
+            background: #0f172a;
+            color: #94a3b8;
+        }
+        .chat-input-row {
+            display: flex;
+            gap: 8px;
+            padding: 12px 20px;
+            border-top: 1px solid #334155;
+        }
+        .chat-input-row textarea {
+            flex: 1;
+            padding: 10px 14px;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            background: #0f172a;
+            color: #e2e8f0;
+            font-size: 14px;
+            outline: none;
+            resize: none;
+            font-family: inherit;
+            min-height: 42px;
+            max-height: 120px;
+        }
+        .chat-input-row textarea:focus { border-color: #3b82f6; }
+        .chat-input-row .btn-send {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 8px;
+            background: #3b82f6;
+            color: #fff;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity .2s;
+        }
+        .chat-input-row .btn-send:hover { opacity: .85; }
+        .chat-input-row .btn-send:disabled {
+            background: #475569;
+            cursor: not-allowed;
+            opacity: .6;
+        }
+
+        .input-row {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+        .input-group {
+            flex: 1;
+            min-width: 280px;
+        }
+        .input-group label {
+            display: block;
+            font-size: 13px;
+            color: #94a3b8;
+            margin-bottom: 6px;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            background: #1e293b;
+            color: #e2e8f0;
+            font-size: 14px;
+            outline: none;
+            transition: border-color .2s;
+        }
+        .input-group input:focus { border-color: #3b82f6; }
+
+        .upload-area {
+            margin-top: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .upload-area .or-label {
+            color: #475569;
+            font-size: 12px;
+        }
+        .file-btn {
+            position: relative;
+            overflow: hidden;
+        }
+        .file-btn input[type="file"] {
+            position: absolute;
+            left: 0; top: 0;
+            width: 100%; height: 100%;
+            opacity: 0;
+            cursor: pointer;
+        }
+        .file-btn label {
+            display: inline-block;
+            padding: 6px 16px;
+            background: #1e293b;
+            border: 1px dashed #475569;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #94a3b8;
+            cursor: pointer;
+            transition: border-color .2s, color .2s;
+        }
+        .file-btn label:hover {
+            border-color: #3b82f6;
+            color: #60a5fa;
+        }
+        .file-name {
+            font-size: 12px;
+            color: #64748b;
+            max-width: 180px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .actions {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+        .actions button {
+            padding: 10px 28px;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: opacity .2s;
+        }
+        .actions button:hover { opacity: .85; }
+        .btn-compare {
+            background: #3b82f6;
+            color: #fff;
+        }
+        .btn-compare:disabled {
+            background: #475569;
+            cursor: not-allowed;
+            opacity: .6;
+        }
+        .btn-reset {
+            background: #334155;
+            color: #cbd5e1;
+        }
+
+        .preview-row {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .preview-box {
+            flex: 1;
+            background: #1e293b;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid #334155;
+            min-height: 300px;
+            display: flex;
+            flex-direction: column;
+        }
+        .preview-box .label-bar {
+            padding: 8px 14px;
+            font-size: 13px;
+            color: #94a3b8;
+            background: #0f172a;
+            border-bottom: 1px solid #334155;
+            display: flex;
+            justify-content: space-between;
+        }
+        .preview-box .label-bar .badge {
+            font-size: 11px;
+            background: #334155;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+        .preview-box .img-wrap {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 12px;
+            overflow: hidden;
+        }
+        .preview-box .img-wrap img {
+            max-width: 100%;
+            max-height: 360px;
+            object-fit: contain;
+            border-radius: 4px;
+            display: none;
+        }
+        .preview-box .img-wrap .placeholder {
+            color: #475569;
+            font-size: 14px;
+        }
+        .preview-box .img-wrap img.loaded { display: block; }
+        .preview-box .img-wrap img.loaded ~ .placeholder { display: none; }
+
+        .preview-box.dragover {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59,130,246,.3);
+        }
+        .preview-box.dragover .img-wrap { background: rgba(59,130,246,.08); }
+        .preview-box.dragover .drop-hint {
+            display: flex !important;
+        }
+
+        .drop-hint {
+            display: none !important;
+            position: absolute;
+            inset: 0;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            color: #60a5fa;
+            background: rgba(15,23,42,.7);
+            border-radius: 10px;
+            z-index: 2;
+            pointer-events: none;
+        }
+        .preview-box .img-wrap {
+            position: relative;
+        }
+
+        /* 结果区 */
+        .result-panel {
+            background: #1e293b;
+            border-radius: 10px;
+            border: 1px solid #334155;
+            padding: 20px 24px;
+            display: none;
+        }
+        .result-panel.show { display: block; }
+        .result-header {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 12px;
+        }
+        .result-badge {
+            font-size: 20px;
+            font-weight: 700;
+            padding: 4px 18px;
+            border-radius: 6px;
+        }
+        .result-badge.same { background: #065f46; color: #6ee7b7; }
+        .result-badge.diff { background: #7f1d1d; color: #fca5a5; }
+        .result-reason {
+            color: #94a3b8;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+        .result-raw {
+            margin-top: 12px;
+            padding: 12px 16px;
+            background: #0f172a;
+            border-radius: 6px;
+            font-family: 'Cascadia Code', 'Fira Code', monospace;
+            font-size: 13px;
+            color: #64748b;
+            white-space: pre-wrap;
+            max-height: 200px;
+            overflow: auto;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            border: 3px solid #475569;
+            border-top-color: #3b82f6;
+            border-radius: 50%;
+            animation: spin .7s linear infinite;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .status-bar {
+            margin-top: 8px;
+            font-size: 13px;
+            color: #64748b;
+            min-height: 20px;
+        }
+        .status-bar.error { color: #f87171; }
+
+        /* 思考面板 */
+        .thinking-panel {
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            overflow: hidden;
+            display: none;
+        }
+        .thinking-panel.show { display: block; }
+        .thinking-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            background: #1e293b;
+            cursor: pointer;
+            user-select: none;
+            font-size: 14px;
+            color: #e2e8f0;
+        }
+        .thinking-header:hover { background: #334155; }
+        .thinking-status {
+            font-size: 12px;
+            color: #fbbf24;
+            margin-left: auto;
+        }
+        .thinking-status.done { color: #34d399; }
+        .thinking-arrow {
+            font-size: 11px;
+            color: #64748b;
+            transition: transform .2s;
+        }
+        .thinking-arrow.collapsed { transform: rotate(-90deg); }
+        .thinking-content {
+            padding: 12px 16px;
+            font-size: 13px;
+            line-height: 1.7;
+            color: #94a3b8;
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-height: 360px;
+            overflow-y: auto;
+        }
+        .thinking-content.collapsed { display: none; }
+
+        /* 设置面板 */
+        .settings-panel {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 16px;
+        }
+        .settings-header {
+            font-size: 13px;
+            color: #64748b;
+            margin-bottom: 10px;
+            cursor: pointer;
+            user-select: none;
+        }
+        .settings-header:hover { color: #94a3b8; }
+        .settings-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+        }
+        .settings-row + .settings-row { margin-top: 10px; }
+        .settings-toggle {
+            padding: 5px 14px;
+            border: 1px solid #475569;
+            border-radius: 6px;
+            background: transparent;
+            color: #94a3b8;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all .2s;
+        }
+        .settings-toggle:hover { border-color: #60a5fa; color: #e2e8f0; }
+        .settings-toggle.active {
+            background: #3b82f6;
+            border-color: #3b82f6;
+            color: #fff;
+        }
+        .settings-input {
+            width: 72px;
+            padding: 5px 10px;
+            border: 1px solid #475569;
+            border-radius: 6px;
+            background: #0f172a;
+            color: #e2e8f0;
+            font-size: 13px;
+            outline: none;
+        }
+        .settings-input:focus { border-color: #3b82f6; }
+        .settings-input::placeholder { color: #475569; }
+        .settings-label { font-size: 13px; color: #94a3b8; margin-right: 2px; }
+        .settings-hint { font-size: 11px; color: #475569; margin-left: 4px; }
+        .settings-prompt {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #475569;
+            border-radius: 6px;
+            background: #0f172a;
+            color: #e2e8f0;
+            font-size: 13px;
+            font-family: 'Cascadia Code', 'Fira Code', monospace;
+            line-height: 1.5;
+            resize: vertical;
+            outline: none;
+            min-height: 180px;
+            box-sizing: border-box;
+        }
+        .settings-prompt:focus { border-color: #3b82f6; }
+
+        .settings-toggle.merge-on {
+            background: #8b5cf6;
+            border-color: #8b5cf6;
+            color: #fff;
+        }
+        .settings-toggle.merge-on:hover { background: #7c3aed; }
+        .settings-toggle.merge-dir {
+            background: #1e293b;
+            border-color: #475569;
+            color: #94a3b8;
+            font-size: 13px;
+            padding: 5px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all .2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .settings-toggle.merge-dir:hover { border-color: #60a5fa; color: #e2e8f0; }
+
+        /* 合并按钮行 */
+        .merge-toggle-row {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 12px;
+        }
+        .merge-dir-btn {
+            background: transparent;
+            border: 1px solid #475569;
+            border-radius: 4px;
+            color: #94a3b8;
+            font-size: 12px;
+            padding: 2px 10px;
+            cursor: pointer;
+            transition: all .2s;
+        }
+        .merge-dir-btn:hover { border-color: #60a5fa; color: #e2e8f0; }
+
+        @media (max-width: 700px) {
+            .preview-row { flex-direction: column; }
+            .input-row { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>
+        🚢 船舶比对
+        <small>AI 判断两张图片中的船是否为同一艘</small>
+    </h1>
+
+    <!-- 模式切换 -->
+    <div class="mode-toggle">
+        <button id="modeFull" class="active" onclick="switchMode('full')">📷 完整模式</button>
+        <button id="modeChat" onclick="switchMode('chat')">💬 仅聊天</button>
+    </div>
+
+    <!-- ================= 完整模式 ================= -->
+    <div class="full-mode active" id="fullMode">
+
+    <!-- 输入 -->
+    <div class="input-row">
+        <div class="input-group">
+            <label>图片 1 URL</label>
+            <input id="url1" type="url" placeholder="https://..." />
+            <div class="upload-area">
+                <span class="or-label">或上传</span>
+                <div class="file-btn">
+                    <label>📁 选择文件</label>
+                    <input type="file" accept="image/*" onchange="onFileSelect(1, this)" />
+                </div>
+                <span class="file-name" id="fileName1"></span>
+            </div>
+        </div>
+        <div class="input-group">
+            <label>图片 2 URL</label>
+            <input id="url2" type="url" placeholder="https://..." />
+            <div class="upload-area">
+                <span class="or-label">或上传</span>
+                <div class="file-btn">
+                    <label>📁 选择文件</label>
+                    <input type="file" accept="image/*" onchange="onFileSelect(2, this)" />
+                </div>
+                <span class="file-name" id="fileName2"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 按钮 -->
+    <div class="actions">
+        <button class="btn-compare" id="btnCompare" onclick="compare()">🔍 开始比对</button>
+        <button class="btn-reset" onclick="resetAll()">⟳ 清空</button>
+    </div>
+
+    <!-- 选项设置 -->                                                                                                                                                                                                                                                                       
+    <div class="settings-panel">
+        <div class="settings-header" onclick="toggleSettings()">⚙ 选项设置 <span id="settingsArrow">▼</span></div>
+        <div id="settingsBody">
+            <div class="settings-row">
+                <button class="settings-toggle active" id="toggleThinking" onclick="toggleSetting('thinking')">🧠 深度思考</button>
+                <button class="settings-toggle active" id="toggleStream" onclick="toggleSetting('stream')">🔄 流式输出</button>
+                <button class="settings-toggle active" id="toggleReason" onclick="toggleSetting('reason')">📝 显示 reason</button>
+            </div>
+            <div class="settings-row">
+                <span class="settings-label">Temperature:</span>
+                <input class="settings-input" id="inputTemperature" type="number" step="0.1" min="0" max="2" placeholder="auto" value="0.6" />
+                <span class="settings-hint">留空则使用模型默认值</span>
+            </div>
+            <div class="settings-row" style="flex-direction:column;align-items:stretch;">
+                <span class="settings-label" style="margin-bottom:4px;">System Prompt:</span>
+                <textarea class="settings-prompt" id="inputPrompt" spellcheck="false">你是一个专业的船舶识别专家。
+
+你将看到两张船舶图片，按顺序依次是[图片1]和[图片2]。
+请从船的细节特征判断，以[图片1]中的船为基准，判断[图片2]中的船是否为同一艘（由于光线问题导致的颜色看起来不同可以忽略）。
+
+same=true 表示确定是同一艘船
+same=false 表示不是同一艘船或无法确定
+
+仅返回 JSON：
+
+{
+  "same": true,
+  "reason": ""
+}</textarea>
+            </div>
+        </div>
+    </div>
+
+    <!-- 预览 -->
+    <div class="preview-row">
+        <div class="preview-box" id="dropZone1">
+            <div class="label-bar"><span>图片 1</span><span class="badge" id="badge1">未加载</span></div>
+            <div class="img-wrap">
+                <img id="img1" onload="onImgLoad(1)" onerror="onImgError(1)" />
+                <span class="placeholder">等待输入 URL 或上传文件…</span>
+                <span class="drop-hint">🖼 松开鼠标上传图片</span>
+            </div>
+        </div>
+        <div class="preview-box" id="dropZone2">
+            <div class="label-bar"><span>图片 2</span><span class="badge" id="badge2">未加载</span></div>
+            <div class="img-wrap">
+                <img id="img2" onload="onImgLoad(2)" onerror="onImgError(2)" />
+                <span class="placeholder">等待输入 URL 或上传文件…</span>
+                <span class="drop-hint">🖼 松开鼠标上传图片</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 合并按钮 -->
+    <div class="merge-toggle-row" id="mergeToggleRow">
+        <button class="settings-toggle" id="toggleMerge" onclick="toggleMerge()">🖼 合并图片</button>
+    </div>
+
+    <!-- 合并预览 -->
+    <div class="preview-row" id="mergePreviewRow" style="display:none;">
+        <div class="preview-box">
+            <div class="label-bar">
+                <span>🖼 合并预览</span>
+                <button class="merge-dir-btn" id="toggleMergeDir" onclick="toggleMergeDir()">↔ 左右合并</button>
+                <button class="merge-dir-btn" id="toggleMergeSwap" onclick="toggleMergeSwap()">⇄ 交换</button>
+                <span class="badge" id="mergeBadge"></span>
+            </div>
+            <div class="img-wrap">
+                <img id="mergePreviewImg" />
+                <span class="placeholder">加载两张图片后自动生成</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="statusBar" class="status-bar"></div>
+
+    <!-- 思考过程 -->
+    <div class="thinking-panel" id="thinkingPanel">
+        <div class="thinking-header" onclick="toggleThinking()">
+            <span>🧠 思考过程</span>
+            <span class="thinking-status" id="thinkingStatus">⏳ 进行中...</span>
+            <span class="thinking-arrow">▼</span>
+        </div>
+        <div class="thinking-content" id="thinkingContent"></div>
+    </div>
+
+    <!-- 结果 -->
+    <div class="result-panel" id="resultPanel">
+        <div class="result-header">
+            <span class="result-badge" id="resultBadge">—</span>
+            <span style="font-size:13px;color:#64748b;">AI 判断结果</span>
+        </div>
+        <div class="result-reason" id="resultReason"></div>
+        <div class="result-raw" id="resultRaw"></div>
+    </div>
+</div><!-- /full-mode -->
+
+    <!-- ================= 聊天模式 ================= -->
+    <div class="chat-mode" id="chatMode">
+        <div class="chat-header">💬 AI 聊天</div>
+        <div class="chat-messages" id="chatMessages">
+            <div class="msg system">你好~ 有什么想问的尽管说喵！</div>
+        </div>
+        <div class="chat-input-row">
+            <textarea id="chatInput" rows="1" placeholder="输入消息…" onkeydown="onChatKeydown(event)"></textarea>
+            <button class="btn-send" id="btnSend" onclick="sendChat()">发送</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ============================================================
+// 配置 — 同 Python 里的 ModelScope 配置
+// ============================================================
+const API_CONFIG = {
+    model: 'qwen3.6',
+};
+
+// ============================================================
+// 设置状态
+// ============================================================
+const SETTINGS = {
+    thinking: true,
+    stream: true,
+    reason: true,
+    mergeEnabled: false,
+    mergeDir: 'horizontal', // 'horizontal' | 'vertical'
+    mergeSwapped: false,
+};
+
+function toggleSetting(key) {
+    SETTINGS[key] = !SETTINGS[key];
+    document.getElementById('toggle' + key.charAt(0).toUpperCase() + key.slice(1))
+        .classList.toggle('active');
+}
+
+function toggleMerge() {
+    SETTINGS.mergeEnabled = !SETTINGS.mergeEnabled;
+    const btn = document.getElementById('toggleMerge');
+    btn.classList.toggle('merge-on');
+    btn.textContent = SETTINGS.mergeEnabled ? '🖼 合并中' : '🖼 合并图片';
+
+    // 显示/隐藏合并预览（方向按钮在预览内部，随预览一起显示/隐藏）
+    document.getElementById('mergePreviewRow').style.display = SETTINGS.mergeEnabled ? '' : 'none';
+    if (SETTINGS.mergeEnabled && imgLoaded[1] && imgLoaded[2]) {
+        updateMergePreview();
+    }
+}
+
+function toggleMergeDir() {
+    SETTINGS.mergeDir = SETTINGS.mergeDir === 'horizontal' ? 'vertical' : 'horizontal';
+    const btn = document.getElementById('toggleMergeDir');
+    btn.textContent = SETTINGS.mergeDir === 'horizontal' ? '↔ 左右合并' : '↕ 上下合并';
+    if (imgLoaded[1] && imgLoaded[2]) {
+        updateMergePreview();
+    }
+}
+
+function toggleMergeSwap() {
+    SETTINGS.mergeSwapped = !SETTINGS.mergeSwapped;
+    const btn = document.getElementById('toggleMergeSwap');
+    btn.textContent = SETTINGS.mergeSwapped ? '⇄ 已交换' : '⇄ 交换';
+    if (imgLoaded[1] && imgLoaded[2]) {
+        updateMergePreview();
+    }
+}
+
+// ============================================================
+// 工具
+// ============================================================
+function setStatus(msg, isError) {
+    const el = document.getElementById('statusBar');
+    el.textContent = msg;
+    el.className = 'status-bar' + (isError ? ' error' : '');
+}
+
+function setLoading(loading) {
+    document.getElementById('btnCompare').disabled = loading;
+    document.getElementById('btnCompare').textContent = loading
+        ? '⏳ 比对中…'
+        : '🔍 开始比对';
+}
+
+// ============================================================
+// 图片预览
+// ============================================================
+let imgLoaded = { 1: false, 2: false };
+let fileSource = { 1: false, 2: false }; // 是否来自文件上传
+
+document.getElementById('url1').addEventListener('input', () => previewImg(1));
+document.getElementById('url2').addEventListener('input', () => previewImg(2));
+
+// 聊天输入框自动调整高度
+document.getElementById('chatInput').addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+});
+
+// ============================================================
+// 文件上传（点击 & 拖拽共用）
+// ============================================================
+function loadFileToImg(idx, file) {
+    const nameEl = document.getElementById('fileName' + idx);
+    nameEl.textContent = file.name;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const img = document.getElementById('img' + idx);
+        const badge = document.getElementById('badge' + idx);
+        img.src = e.target.result;
+        badge.textContent = '加载中…';
+        fileSource[idx] = true;
+    };
+    reader.readAsDataURL(file);
+}
+
+// ============================================================
+// 拖拽上传
+// ============================================================
+;[1, 2].forEach(idx => {
+    const zone = document.getElementById('dropZone' + idx);
+
+    // 阻止浏览器默认打开拖入图片
+    zone.addEventListener('dragenter', (e) => { e.preventDefault(); zone.classList.add('dragover'); });
+    zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.classList.add('dragover'); });
+    zone.addEventListener('dragleave', (e) => { e.preventDefault(); zone.classList.remove('dragover'); });
+    zone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        zone.classList.remove('dragover');
+        const file = e.dataTransfer.files?.[0];
+        if (file && file.type.startsWith('image/')) {
+            loadFileToImg(idx, file);
+        }
+    });
+});
+
+function onFileSelect(idx, input) {
+    const file = input.files?.[0];
+    const nameEl = document.getElementById('fileName' + idx);
+    if (!file) {
+        nameEl.textContent = '';
+        return;
+    }
+    loadFileToImg(idx, file);
+}
+
+function previewImg(idx) {
+    const input = document.getElementById('url' + idx);
+    const img = document.getElementById('img' + idx);
+    const badge = document.getElementById('badge' + idx);
+    const url = input.value.trim();
+    if (!url) {
+        img.classList.remove('loaded');
+        img.src = '';
+        badge.textContent = '未加载';
+        imgLoaded[idx] = false;
+        return;
+    }
+    imgLoaded[idx] = false;
+    badge.textContent = '加载中…';
+    img.src = url;
+}
+
+function onImgLoad(idx) {
+    const img = document.getElementById('img' + idx);
+    const badge = document.getElementById('badge' + idx);
+    img.classList.add('loaded');
+    badge.textContent = img.naturalWidth + '×' + img.naturalHeight;
+    imgLoaded[idx] = true;
+    // 合并模式下自动刷新预览
+    if (SETTINGS.mergeEnabled && imgLoaded[1] && imgLoaded[2]) {
+        updateMergePreview();
+    }
+}
+
+function onImgError(idx) {
+    const badge = document.getElementById('badge' + idx);
+    badge.textContent = '❌ 加载失败';
+    imgLoaded[idx] = false;
+}
+
+// ============================================================
+// 图片 → base64
+// ============================================================
+function toBase64(img) {
+    const c = document.createElement('canvas');
+    c.width = img.naturalWidth;
+    c.height = img.naturalHeight;
+    const ctx = c.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    return c.toDataURL('image/jpeg', 0.95);
+}
+
+// ============================================================
+// 图片合并
+// ============================================================
+function mergeImages(img1, img2, direction) {
+    const gap = 0;
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    if (direction === 'vertical') {
+        canvas.width = Math.max(img1.naturalWidth, img2.naturalWidth);
+        canvas.height = img1.naturalHeight + gap + img2.naturalHeight;
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img1, (canvas.width - img1.naturalWidth) / 2, 0);
+        ctx.drawImage(img2, (canvas.width - img2.naturalWidth) / 2, img1.naturalHeight + gap);
+    } else {
+        canvas.width = img1.naturalWidth + gap + img2.naturalWidth;
+        canvas.height = Math.max(img1.naturalHeight, img2.naturalHeight);
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img1, 0, (canvas.height - img1.naturalHeight) / 2);
+        ctx.drawImage(img2, img1.naturalWidth + gap, (canvas.height - img2.naturalHeight) / 2);
+    }
+
+    return canvas.toDataURL('image/jpeg', 0.95);
+}
+
+function updateMergePreview() {
+    const img1 = document.getElementById('img1');
+    const img2 = document.getElementById('img2');
+    const preview = document.getElementById('mergePreviewImg');
+    const badge = document.getElementById('mergeBadge');
+
+    const mergedUrl = mergeImages(
+        SETTINGS.mergeSwapped ? img2 : img1,
+        SETTINGS.mergeSwapped ? img1 : img2,
+        SETTINGS.mergeDir
+    );
+    preview.src = mergedUrl;
+    preview.classList.add('loaded');
+    badge.textContent = SETTINGS.mergeDir === 'horizontal' ? '左右' : '上下';
+}
+
+// ============================================================
+// 核心：调用 API
+// ============================================================
+async function compare() {
+    const img1 = document.getElementById('img1');
+    const img2 = document.getElementById('img2');
+
+    // 至少有一张图片加载了
+    if (!imgLoaded[1] || !imgLoaded[2]) {
+        setStatus('⚠️ 请先输入两张图片的 URL 或上传本地文件', true);
+        return;
+    }
+
+    // 重置结果
+    const panel = document.getElementById('resultPanel');
+    panel.classList.remove('show');
+
+    setLoading(true);
+    setStatus('🧠 AI 正在分析两张图片…');
+
+    try {
+        const systemPrompt = document.getElementById("inputPrompt").value;
+
+        // 图片转 base64（支持合并模式）
+        const contentItems = [{ type: 'text', text: systemPrompt }];
+        if (SETTINGS.mergeEnabled) {
+            const mergedUrl = mergeImages(
+                SETTINGS.mergeSwapped ? img2 : img1,
+                SETTINGS.mergeSwapped ? img1 : img2,
+                SETTINGS.mergeDir
+            );
+            contentItems.push({ type: 'image_url', image_url: { url: mergedUrl } });
+        } else {
+            const b64_1 = toBase64(img1);
+            const b64_2 = toBase64(img2);
+            contentItems.push(
+                { type: 'image_url', image_url: { url: b64_1 } },
+                { type: 'image_url', image_url: { url: b64_2 } },
+            );
+        }
+
+        const body = {
+            model: API_CONFIG.model,
+            messages: [
+                {
+                    role: 'user',
+                    content: contentItems,
+                },
+            ],
+            chat_template_kwargs: {
+                enable_thinking: SETTINGS.thinking,
+            },
+            extra_body: {"thinking_budget": 4096}
+        };
+
+        if (SETTINGS.stream) {
+            body.stream = true;
+        }
+
+        const tempVal = document.getElementById('inputTemperature').value.trim();
+        if (tempVal !== '') {
+            body.temperature = parseFloat(tempVal);
+        }
+
+        const resp = await fetch('/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+
+        if (!resp.ok) {
+            const errText = await resp.text().catch(() => '');
+            throw new Error(`API ${resp.status}: ${errText.slice(0, 200)}`);
+        }
+
+        // ==========================
+        // 响应处理（流式 / 非流式）
+        // ==========================
+        let textResult;
+
+        if (SETTINGS.stream) {
+            showThinkingPanel();
+
+            const reader = resp.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let contentParts = [];
+            let thinkingDone = false;
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop();
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        const dataStr = line.slice(6).trim();
+                        if (dataStr === '[DONE]') continue;
+
+                        try {
+                            const chunk = JSON.parse(dataStr);
+                            const delta = chunk.choices?.[0]?.delta || {};
+
+                            if (delta.reasoning_content) {
+                                updateThinking(delta.reasoning_content);
+                            }
+
+                            if (delta.content) {
+                                if (!thinkingDone) {
+                                    thinkingDone = true;
+                                    finishThinking();
+                                }
+                                contentParts.push(delta.content);
+                            }
+                        } catch (_) {}
+                    }
+                }
+            }
+
+            textResult = contentParts.join('').trim();
+        } else {
+            const data = await resp.json();
+            textResult = (data.choices?.[0]?.message?.content || '').trim();
+        }
+
+        // ==========================
+        // 解析最终结果
+        // ==========================
+        if (textResult.startsWith('```json') && textResult.endsWith('```')) {
+            textResult = textResult.slice(7, -3).trim();
+        }
+
+        const result = JSON.parse(textResult);
+        showResult(result, textResult);
+
+        setStatus('✅ 比对完成');
+    } catch (err) {
+        setStatus('❌ ' + err.message, true);
+        console.error(err);
+    } finally {
+        setLoading(false);
+    }
+}
+
+// ============================================================
+// 展示结果
+// ============================================================
+function showResult(result, raw) {
+    const panel = document.getElementById('resultPanel');
+    const badge = document.getElementById('resultBadge');
+    const reason = document.getElementById('resultReason');
+    const rawEl = document.getElementById('resultRaw');
+
+    const same = result.same === true;
+    badge.textContent = same ? '✅ 同一艘船' : '❌ 不同船';
+    badge.className = 'result-badge ' + (same ? 'same' : 'diff');
+
+    if (SETTINGS.reason) {
+        reason.textContent = result.reason || '—';
+        reason.style.display = '';
+    } else {
+        reason.style.display = 'none';
+    }
+
+    rawEl.textContent = raw;
+    panel.classList.add('show');
+}
+
+// ============================================================
+// 思考面板控制
+// ============================================================
+function showThinkingPanel() {
+    document.getElementById('thinkingPanel').classList.add('show');
+    document.getElementById('thinkingContent').textContent = '';
+    document.getElementById('thinkingStatus').textContent = '⏳ 进行中...';
+    document.getElementById('thinkingStatus').className = 'thinking-status';
+}
+
+function toggleThinking() {
+    const content = document.getElementById('thinkingContent');
+    const arrow = document.querySelector('.thinking-arrow');
+    content.classList.toggle('collapsed');
+    arrow.classList.toggle('collapsed');
+}
+
+function updateThinking(text) {
+    const el = document.getElementById('thinkingContent');
+    el.textContent += text;
+    el.scrollTop = el.scrollHeight;
+}
+
+function finishThinking() {
+    document.getElementById('thinkingStatus').textContent = '✅ 已完成';
+    document.getElementById('thinkingStatus').className = 'thinking-status done';
+}
+
+// ============================================================
+// 模式切换
+// ============================================================
+function switchMode(mode) {
+    document.getElementById('modeFull').classList.toggle('active', mode === 'full');
+    document.getElementById('modeChat').classList.toggle('active', mode === 'chat');
+    document.getElementById('fullMode').classList.toggle('active', mode === 'full');
+    document.getElementById('chatMode').classList.toggle('active', mode === 'chat');
+    if (mode === 'chat') {
+        document.getElementById('chatInput').focus();
+    }
+}
+
+// ============================================================
+// 设置面板折叠
+// ============================================================
+let settingsVisible = true;
+function toggleSettings() {
+    settingsVisible = !settingsVisible;
+    document.getElementById('settingsBody').style.display = settingsVisible ? '' : 'none';
+    document.getElementById('settingsArrow').textContent = settingsVisible ? '▼' : '▶';
+}
+
+// ============================================================
+// 聊天功能
+// ============================================================
+let chatHistory = [];
+const CHAT_HISTORY_LIMIT = 20; // 最多保留 10 轮对话
+
+function addChatMessage(role, text) {
+    const container = document.getElementById('chatMessages');
+    const div = document.createElement('div');
+    div.className = 'msg ' + role;
+    div.textContent = text;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+    return div;
+}
+
+function onChatKeydown(event) {
+    if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        sendChat();
+    }
+}
+
+async function sendChat() {
+    const input = document.getElementById('chatInput');
+    const text = input.value.trim();
+    if (!text) return;
+
+    // 清空输入
+    input.value = '';
+    input.style.height = 'auto';
+    addChatMessage('user', text);
+
+    const sendBtn = document.getElementById('btnSend');
+    sendBtn.disabled = true;
+
+    try {
+        const systemPrompt = document.getElementById('inputPrompt').value;
+
+        // 构建完整消息列表
+        const messages = [
+            { role: 'system', content: systemPrompt },
+            ...chatHistory,
+            { role: 'user', content: text },
+        ];
+
+        const body = {
+            model: API_CONFIG.model,
+            messages,
+            chat_template_kwargs: { enable_thinking: SETTINGS.thinking },
+            stream: SETTINGS.stream,
+        };
+
+        const tempVal = document.getElementById('inputTemperature').value.trim();
+        if (tempVal !== '') body.temperature = parseFloat(tempVal);
+
+        const resp = await fetch('/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+
+        if (!resp.ok) {
+            const errText = await resp.text().catch(() => '');
+            throw new Error(`API ${resp.status}: ${errText.slice(0, 200)}`);
+        }
+
+        let fullContent = '';
+
+        if (SETTINGS.stream) {
+            // 显示加载中提示
+            const loadingEl = addChatMessage('loading', '⏳ 思考中...');
+
+            const reader = resp.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let assistantEl = null;
+            let started = false;
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop();
+
+                for (const line of lines) {
+                    if (!line.startsWith('data: ')) continue;
+                    const dataStr = line.slice(6).trim();
+                    if (dataStr === '[DONE]') continue;
+
+                    try {
+                        const chunk = JSON.parse(dataStr);
+                        const delta = chunk.choices?.[0]?.delta || {};
+
+                        if (delta.content) {
+                            if (!started) {
+                                started = true;
+                                loadingEl.remove();
+                                assistantEl = addChatMessage('assistant', '');
+                                fullContent = delta.content;
+                                assistantEl.textContent = fullContent;
+                            } else {
+                                fullContent += delta.content;
+                                if (assistantEl) {
+                                    assistantEl.textContent = fullContent;
+                                }
+                            }
+                        }
+                    } catch (_) { /* 忽略解析失败的行 */ }
+                }
+            }
+
+            // 流结束但从未收到 content
+            if (!started) {
+                loadingEl.textContent = '⚠️ 模型未返回文本内容';
+                loadingEl.className = 'msg system';
+                fullContent = '';
+            }
+        } else {
+            // 非流式模式
+            const data = await resp.json();
+            fullContent = (data.choices?.[0]?.message?.content || '').trim();
+            addChatMessage('assistant', fullContent);
+        }
+
+        // 更新对话历史
+        if (fullContent) {
+            chatHistory.push({ role: 'user', content: text });
+            chatHistory.push({ role: 'assistant', content: fullContent });
+
+            // 限制历史长度
+            if (chatHistory.length > CHAT_HISTORY_LIMIT) {
+                chatHistory = chatHistory.slice(chatHistory.length - CHAT_HISTORY_LIMIT);
+            }
+        }
+
+    } catch (err) {
+        addChatMessage('system', '❌ ' + err.message);
+        console.error(err);
+    } finally {
+        sendBtn.disabled = false;
+        document.getElementById('chatInput').focus();
+    }
+}
+
+// ============================================================
+// 清空
+// ============================================================
+function resetAll() {
+    document.getElementById('url1').value = '';
+    document.getElementById('url2').value = '';
+    document.getElementById('img1').classList.remove('loaded');
+    document.getElementById('img1').src = '';
+    document.getElementById('img2').classList.remove('loaded');
+    document.getElementById('img2').src = '';
+    document.getElementById('badge1').textContent = '未加载';
+    document.getElementById('badge2').textContent = '未加载';
+    document.getElementById('resultPanel').classList.remove('show');
+    document.getElementById('thinkingPanel').classList.remove('show');
+    document.getElementById('mergePreviewRow').style.display = 'none';
+    document.getElementById('mergePreviewImg').classList.remove('loaded');
+    document.getElementById('mergePreviewImg').src = '';
+    SETTINGS.mergeSwapped = false;
+    document.getElementById('toggleMergeSwap').textContent = '⇄ 交换';
+    document.getElementById('statusBar').textContent = '';
+    document.getElementById('fileName1').textContent = '';
+    document.getElementById('fileName2').textContent = '';
+    // 清空 file input
+    document.querySelectorAll('input[type="file"]').forEach(el => el.value = '');
+    imgLoaded[1] = false;
+    imgLoaded[2] = false;
+    fileSource[1] = false;
+    fileSource[2] = false;
+}
+</script>
+</body>
+</html>

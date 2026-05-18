@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import { reactive, computed, watch, ref } from 'vue'
-import type { Node } from '@/types'
-import type { CompareFrame } from '@/utils/tree-utils'
-import { api as viewerApi } from 'v-viewer'
 import type { ReviewRecord } from '@/api/tree'
+import { api as viewerApi } from 'v-viewer'
 import { Edit } from '@element-plus/icons-vue'
 import ContextMenu from '@/components/context-menu/index.vue'
 import type { ContextMenuItem } from '@/components/context-menu/index.vue'
 import { Search } from '@element-plus/icons-vue'
+import { useCompareStore } from '@/stores/compareStore'
+import { useTreeStore } from '@/stores/treeStore'
+
+const compareStore = useCompareStore()
+const treeStore = useTreeStore()
 
 const isViewerOpen = ref(false)
 
@@ -26,49 +29,11 @@ function openImageViewer(url: string) {
 
 const props = defineProps<{
   modelValue: boolean
-  viewMode: 'tree' | 'timeline'
-  gridMode: '2' | '4'
-  compareRootImage: string
-  compareRootLabel: string
-  compareTimelineNodes: Node[]
-  comparePage: number
-  maxComparePage: number
-  isCompareFirstPage: boolean
-  isCompareLastPage: boolean
-  currentFrame: CompareFrame | null
-  compareChildPage: number
-  maxChildPage: number
-  compareFrameIndex: number
-  compareTreeFrames: CompareFrame[]
-  isFirstChildPage: boolean
-  isFirstFrame: boolean
-  isLastChildPage: boolean
-  isLastFrame: boolean
-  hasPrevCompareTrees: boolean
-  hasMoreCompareTrees: boolean
-  childPageSize: number
-  isSingleNodePreview: boolean
-  singlePreviewImage: string
-  singlePreviewLabel: string
-  compareTreeName: string
-  compareTreeRootId: string
 }>()
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
-  'update:comparePage': [value: number]
-  'update:compareChildPage': [value: number]
-  'update:gridMode': [value: '2' | '4']
-  'prev-compare-group': []
-  'next-compare-group': []
-  'go-prev-frame': []
-  'go-next-frame': []
-  'prev-compare-tree': []
-  'next-compare-tree': []
-  'closed': []
-  'keydown': [e: KeyboardEvent]
   'submit-review': [records: ReviewRecord[]]
-  'update-tree-name': [name: string]
   'search-history': [selfId: string]
 }>()
 
@@ -92,14 +57,14 @@ const isEditingName = ref(false)
 const editingName = ref('')
 
 function startEditName() {
-  editingName.value = props.compareTreeName
+  editingName.value = compareStore.compareTreeName
   isEditingName.value = true
 }
 
 function confirmEditName() {
   const newName = editingName.value.trim()
-  if (newName && newName !== props.compareTreeName) {
-    emit('update-tree-name', newName)
+  if (newName && newName !== compareStore.compareTreeName) {
+    compareStore.updateTreeName(newName)
   }
   isEditingName.value = false
 }
@@ -109,13 +74,13 @@ function cancelEditName() {
 }
 
 function getReviewKey(childIndex: number): string {
-  return `${props.compareFrameIndex}-${childIndex}`
+  return `${compareStore.compareFrameIndex}-${childIndex}`
 }
 
 function getReviewState(childIndex: number): '一致' | '不一致' | undefined {
   const key = getReviewKey(childIndex)
   if (reviewStates[key] !== undefined) return reviewStates[key]
-  const child = props.currentFrame?.children[childIndex]
+  const child = compareStore.currentFrame?.children[childIndex]
   if (child) {
     if (child.reviewResult === '一致') return '一致'
     if (child.reviewResult === '不一致') return '不一致'
@@ -125,7 +90,7 @@ function getReviewState(childIndex: number): '一致' | '不一致' | undefined 
 
 function setReviewState(childIndex: number, result: '一致' | '不一致') {
   const key = getReviewKey(childIndex)
-  const child = props.currentFrame?.children[childIndex]
+  const child = compareStore.currentFrame?.children[childIndex]
   const initialValue = child
     ? (child.reviewResult === '一致' ? '一致' : child.reviewResult === '不一致' ? '不一致' : undefined)
     : undefined
@@ -139,14 +104,14 @@ function setReviewState(childIndex: number, result: '一致' | '不一致') {
 }
 
 const hasAnyReview = computed(() => {
-  if (!props.currentFrame) return false
-  return props.currentFrame.children.some((_, idx) => getReviewState(idx) !== undefined)
+  if (!compareStore.currentFrame) return false
+  return compareStore.currentFrame.children.some((_, idx) => getReviewState(idx) !== undefined)
 })
 
 function submitReview() {
-  if (!props.currentFrame) return
+  if (!compareStore.currentFrame) return
   const records: ReviewRecord[] = []
-  props.currentFrame.children.forEach((child, idx) => {
+  compareStore.currentFrame.children.forEach((child, idx) => {
     const state = getReviewState(idx)
     if (state) {
       records.push({ selfId: child.selfId, reviewResult: state })
@@ -165,23 +130,23 @@ watch(() => props.modelValue, (val) => {
   if (!val) clearReviewStates()
 })
 
-const gridClass = computed(() => `compare-grid--${props.gridMode}`)
+const gridClass = computed(() => `compare-grid--${compareStore.gridMode}`)
 </script>
 
 <template>
   <el-dialog
     :model-value="modelValue"
-    :title="viewMode === 'timeline' ? '时间轴比对' : '树形比对'"
+    :title="treeStore.viewMode === 'timeline' ? '时间轴比对' : '树形比对'"
     fullscreen
     append-to-body
     :close-on-press-escape="!isViewerOpen"
     @update:model-value="emit('update:modelValue', $event)"
-    @closed="emit('closed')"
-    @keydown="emit('keydown', $event)"
+    @closed="compareStore.onCompareClosed()"
+    @keydown="compareStore.handleCompareKeydown($event)"
   >
-    <div v-if="viewMode === 'tree'" class="tree-name-bar">
+    <div v-if="treeStore.viewMode === 'tree'" class="tree-name-bar">
       <template v-if="!isEditingName">
-        <span v-if="compareTreeName" class="tree-name-text">{{ compareTreeName }}</span>
+        <span v-if="compareStore.compareTreeName" class="tree-name-text">{{ compareStore.compareTreeName }}</span>
         <el-button size="small" :icon="Edit" circle @click="startEditName" />
       </template>
       <template v-else>
@@ -190,24 +155,24 @@ const gridClass = computed(() => `compare-grid--${props.gridMode}`)
         <el-button size="small" @click="cancelEditName">取消</el-button>
       </template>
     </div>
-    <template v-if="isSingleNodePreview">
+    <template v-if="compareStore.isSingleNodePreview">
       <div class="single-preview">
-        <el-image :src="singlePreviewImage" fit="contain" class="single-preview-image" @dblclick="openImageViewer(singlePreviewImage)" @contextmenu.prevent="handleImageContextMenu($event, singlePreviewLabel)">
+        <el-image :src="compareStore.singlePreviewImage" fit="contain" class="single-preview-image" @dblclick="openImageViewer(compareStore.singlePreviewImage)" @contextmenu.prevent="handleImageContextMenu($event, compareStore.singlePreviewLabel)">
           <template #placeholder>
             <div class="compare-image-loading">
               <div class="loading-spinner"></div>
             </div>
           </template>
         </el-image>
-        <div class="compare-label">{{ singlePreviewLabel }}</div>
+        <div class="compare-label">{{ compareStore.singlePreviewLabel }}</div>
       </div>
     </template>
-    <template v-else-if="viewMode === 'tree' && currentFrame">
+    <template v-else-if="treeStore.viewMode === 'tree' && compareStore.currentFrame">
       <div class="compare-body">
         <div class="compare-grid" :class="gridClass">
           <div class="compare-cell">
             <div class="compare-image-wrapper">
-              <el-image :src="currentFrame.parent.selfUrl" fit="contain" class="compare-image" @dblclick="openImageViewer(currentFrame.parent.selfUrl)" @contextmenu.prevent="handleImageContextMenu($event, currentFrame.parent.selfId)">
+              <el-image :src="compareStore.currentFrame.parent.selfUrl" fit="contain" class="compare-image" @dblclick="openImageViewer(compareStore.currentFrame.parent.selfUrl)" @contextmenu.prevent="handleImageContextMenu($event, compareStore.currentFrame.parent.selfId)">
                 <template #placeholder>
                   <div class="compare-image-loading">
                     <div class="loading-spinner"></div>
@@ -215,17 +180,17 @@ const gridClass = computed(() => `compare-grid--${props.gridMode}`)
                 </template>
               </el-image>
             </div>
-            <div class="compare-label">{{ currentFrame.parent.selfId }} | {{ currentFrame.position }}层</div>
+            <div class="compare-label">{{ compareStore.currentFrame.parent.selfId }} | {{ compareStore.currentFrame.position }}层</div>
           </div>
-          <div v-for="i in childPageSize" :key="i" class="compare-cell compare-cell--child">
-            <template v-if="currentFrame.children[compareChildPage * childPageSize + i - 1]">
+          <div v-for="i in compareStore.childPageSize" :key="i" class="compare-cell compare-cell--child">
+            <template v-if="compareStore.currentFrame.children[compareStore.compareChildPage * compareStore.childPageSize + i - 1]">
               <div class="compare-image-wrapper">
                 <el-image
-                  :src="currentFrame.children[compareChildPage * childPageSize + i - 1]!.selfUrl"
+                  :src="compareStore.currentFrame.children[compareStore.compareChildPage * compareStore.childPageSize + i - 1]!.selfUrl"
                   fit="contain"
                   class="compare-image"
-                  @dblclick="openImageViewer(currentFrame.children[compareChildPage * childPageSize + i - 1]!.selfUrl)"
-                  @contextmenu.prevent="handleImageContextMenu($event, currentFrame.children[compareChildPage * childPageSize + i - 1]!.selfId)"
+                  @dblclick="openImageViewer(compareStore.currentFrame.children[compareStore.compareChildPage * compareStore.childPageSize + i - 1]!.selfUrl)"
+                  @contextmenu.prevent="handleImageContextMenu($event, compareStore.currentFrame.children[compareStore.compareChildPage * compareStore.childPageSize + i - 1]!.selfId)"
                 >
                   <template #placeholder>
                     <div class="compare-image-loading">
@@ -234,105 +199,105 @@ const gridClass = computed(() => `compare-grid--${props.gridMode}`)
                   </template>
                 </el-image>
                 <div
-                  v-if="gridMode === '4'"
+                  v-if="compareStore.gridMode === '4'"
                   class="cell-corner-group"
                   :class="`cell-corner-group--pos${i}`"
                 >
-                  <div class="score-badge score-badge--4">{{ currentFrame.children[compareChildPage * childPageSize + i - 1]!.score }}</div>
+                  <div class="score-badge score-badge--4">{{ compareStore.currentFrame.children[compareStore.compareChildPage * compareStore.childPageSize + i - 1]!.score }}</div>
                   <div class="review-buttons review-buttons--4">
                     <button
                       class="review-btn review-btn--pass"
-                      :class="{ active: getReviewState(compareChildPage * childPageSize + i - 1) === '一致' }"
-                      @click="setReviewState(compareChildPage * childPageSize + i - 1, '一致')"
+                      :class="{ active: getReviewState(compareStore.compareChildPage * compareStore.childPageSize + i - 1) === '一致' }"
+                      @click="setReviewState(compareStore.compareChildPage * compareStore.childPageSize + i - 1, '一致')"
                     >✔</button>
                     <button
                       class="review-btn review-btn--fail"
-                      :class="{ active: getReviewState(compareChildPage * childPageSize + i - 1) === '不一致' }"
-                      @click="setReviewState(compareChildPage * childPageSize + i - 1, '不一致')"
+                      :class="{ active: getReviewState(compareStore.compareChildPage * compareStore.childPageSize + i - 1) === '不一致' }"
+                      @click="setReviewState(compareStore.compareChildPage * compareStore.childPageSize + i - 1, '不一致')"
                     >✘</button>
                   </div>
                 </div>
                 <div
-                  v-if="gridMode === '2'"
+                  v-if="compareStore.gridMode === '2'"
                   class="review-bar"
                 >
                   <button
                     class="review-btn-lg review-btn-lg--pass"
-                    :class="{ active: getReviewState(compareChildPage * childPageSize + i - 1) === '一致' }"
-                    @click="setReviewState(compareChildPage * childPageSize + i - 1, '一致')"
+                    :class="{ active: getReviewState(compareStore.compareChildPage * compareStore.childPageSize + i - 1) === '一致' }"
+                    @click="setReviewState(compareStore.compareChildPage * compareStore.childPageSize + i - 1, '一致')"
                   >✔ 一致</button>
                   <button
                     class="review-btn-lg review-btn-lg--fail"
-                    :class="{ active: getReviewState(compareChildPage * childPageSize + i - 1) === '不一致' }"
-                    @click="setReviewState(compareChildPage * childPageSize + i - 1, '不一致')"
+                    :class="{ active: getReviewState(compareStore.compareChildPage * compareStore.childPageSize + i - 1) === '不一致' }"
+                    @click="setReviewState(compareStore.compareChildPage * compareStore.childPageSize + i - 1, '不一致')"
                   >✘ 不一致</button>
                 </div>
                 <div
-                  v-if="gridMode === '2'"
+                  v-if="compareStore.gridMode === '2'"
                   class="score-badge score-badge--2"
-                >{{ currentFrame.children[compareChildPage * childPageSize + i - 1]!.score }}</div>
+                >{{ compareStore.currentFrame.children[compareStore.compareChildPage * compareStore.childPageSize + i - 1]!.score }}</div>
               </div>
               <div class="compare-label">
-                {{ currentFrame.children[compareChildPage * childPageSize + i - 1]!.selfId }}
-                {{ currentFrame.children[compareChildPage * childPageSize + i - 1]!.matchDate }}
+                {{ compareStore.currentFrame.children[compareStore.compareChildPage * compareStore.childPageSize + i - 1]!.selfId }}
+                {{ compareStore.currentFrame.children[compareStore.compareChildPage * compareStore.childPageSize + i - 1]!.matchDate }}
               </div>
             </template>
             <div v-else class="compare-placeholder"></div>
           </div>
         </div>
         <div class="compare-controls">
-          <el-radio-group :model-value="gridMode" size="small" @update:model-value="emit('update:gridMode', $event as '2' | '4')">
+          <el-radio-group :model-value="compareStore.gridMode" size="small" @update:model-value="compareStore.gridMode = $event as '2' | '4'">
             <el-radio-button value="2">2宫格</el-radio-button>
             <el-radio-button value="4">4宫格</el-radio-button>
           </el-radio-group>
           <div class="compare-controls-divider"></div>
           <el-button
-            v-if="isFirstChildPage && isFirstFrame && hasPrevCompareTrees"
+            v-if="compareStore.isFirstChildPage && compareStore.isFirstFrame && compareStore.hasPrevCompareTrees"
             type="primary"
             size="small"
-            @click="emit('prev-compare-tree')"
+            @click="compareStore.prevCompareTree()"
           >
             上一颗树
           </el-button>
           <el-button
-            v-else-if="isFirstChildPage && !isFirstFrame"
+            v-else-if="compareStore.isFirstChildPage && !compareStore.isFirstFrame"
             size="small"
-            @click="emit('go-prev-frame')"
+            @click="compareStore.goPrevFrame()"
           >
             上一帧
           </el-button>
           <el-button
             v-else
             size="small"
-            :disabled="isFirstChildPage"
-            @click="emit('update:compareChildPage', compareChildPage - 1)"
+            :disabled="compareStore.isFirstChildPage"
+            @click="compareStore.compareChildPage = compareStore.compareChildPage - 1"
           >
             上一页
           </el-button>
           <span class="compare-page-info">
-            帧 {{ compareFrameIndex + 1 }}/{{ compareTreeFrames.length }}
-            · 页 {{ compareChildPage + 1 }}/{{ maxChildPage }}
+            帧 {{ compareStore.compareFrameIndex + 1 }}/{{ compareStore.compareTreeFrames.length }}
+            · 页 {{ compareStore.compareChildPage + 1 }}/{{ compareStore.maxChildPage }}
           </span>
           <el-button
-            v-if="isLastChildPage && isLastFrame && hasMoreCompareTrees"
+            v-if="compareStore.isLastChildPage && compareStore.isLastFrame && compareStore.hasMoreCompareTrees"
             type="primary"
             size="small"
-            @click="emit('next-compare-tree')"
+            @click="compareStore.nextCompareTree()"
           >
             下一颗树
           </el-button>
           <el-button
-            v-else-if="isLastChildPage && !isLastFrame"
+            v-else-if="compareStore.isLastChildPage && !compareStore.isLastFrame"
             size="small"
-            @click="emit('go-next-frame')"
+            @click="compareStore.goNextFrame()"
           >
             下一帧
           </el-button>
           <el-button
             v-else
             size="small"
-            :disabled="isLastChildPage"
-            @click="emit('update:compareChildPage', compareChildPage + 1)"
+            :disabled="compareStore.isLastChildPage"
+            @click="compareStore.compareChildPage = compareStore.compareChildPage + 1"
           >
             下一页
           </el-button>
@@ -353,7 +318,7 @@ const gridClass = computed(() => `compare-grid--${props.gridMode}`)
         <div class="compare-grid" :class="gridClass">
           <div class="compare-cell">
             <div class="compare-image-wrapper">
-              <el-image :src="compareRootImage" fit="contain" class="compare-image" @dblclick="openImageViewer(compareRootImage)" @contextmenu.prevent="handleImageContextMenu($event, compareRootLabel)">
+              <el-image :src="compareStore.compareRootImage" fit="contain" class="compare-image" @dblclick="openImageViewer(compareStore.compareRootImage)" @contextmenu.prevent="handleImageContextMenu($event, compareStore.compareRootLabel)">
                 <template #placeholder>
                   <div class="compare-image-loading">
                     <div class="loading-spinner"></div>
@@ -361,17 +326,17 @@ const gridClass = computed(() => `compare-grid--${props.gridMode}`)
                 </template>
               </el-image>
             </div>
-            <div class="compare-label">{{ compareRootLabel }}</div>
+            <div class="compare-label">{{ compareStore.compareRootLabel }}</div>
           </div>
-          <div v-for="i in childPageSize" :key="i" class="compare-cell">
-            <template v-if="compareTimelineNodes[comparePage * childPageSize + i - 1]">
+          <div v-for="i in compareStore.childPageSize" :key="i" class="compare-cell">
+            <template v-if="compareStore.compareTimelineNodes[compareStore.comparePage * compareStore.childPageSize + i - 1]">
               <div class="compare-image-wrapper">
                 <el-image
-                  :src="compareTimelineNodes[comparePage * childPageSize + i - 1]?.imageUrl"
+                  :src="compareStore.compareTimelineNodes[compareStore.comparePage * compareStore.childPageSize + i - 1]?.imageUrl"
                   fit="contain"
                   class="compare-image"
-                  @dblclick="openImageViewer(compareTimelineNodes[comparePage * childPageSize + i - 1]?.imageUrl || '')"
-                  @contextmenu.prevent="handleImageContextMenu($event, compareTimelineNodes[comparePage * childPageSize + i - 1]?.selfId || '')"
+                  @dblclick="openImageViewer(compareStore.compareTimelineNodes[compareStore.comparePage * compareStore.childPageSize + i - 1]?.imageUrl || '')"
+                  @contextmenu.prevent="handleImageContextMenu($event, compareStore.compareTimelineNodes[compareStore.comparePage * compareStore.childPageSize + i - 1]?.selfId || '')"
                 >
                   <template #placeholder>
                     <div class="compare-image-loading">
@@ -381,49 +346,49 @@ const gridClass = computed(() => `compare-grid--${props.gridMode}`)
                 </el-image>
               </div>
               <div class="compare-label">
-                {{ compareTimelineNodes[comparePage * childPageSize + i - 1]?.selfId }}
-                {{ compareTimelineNodes[comparePage * childPageSize + i - 1]?.matchDate }}
+                {{ compareStore.compareTimelineNodes[compareStore.comparePage * compareStore.childPageSize + i - 1]?.selfId }}
+                {{ compareStore.compareTimelineNodes[compareStore.comparePage * compareStore.childPageSize + i - 1]?.matchDate }}
               </div>
             </template>
             <div v-else class="compare-placeholder"></div>
           </div>
         </div>
         <div class="compare-controls">
-          <el-radio-group :model-value="gridMode" size="small" @update:model-value="emit('update:gridMode', $event as '2' | '4')">
+          <el-radio-group :model-value="compareStore.gridMode" size="small" @update:model-value="compareStore.gridMode = $event as '2' | '4'">
             <el-radio-button value="2">2宫格</el-radio-button>
             <el-radio-button value="4">4宫格</el-radio-button>
           </el-radio-group>
           <div class="compare-controls-divider"></div>
           <el-button
-            v-if="isCompareFirstPage && hasPrevCompareTrees"
+            v-if="compareStore.isCompareFirstPage && compareStore.hasPrevCompareTrees"
             type="primary"
             size="small"
-            @click="emit('prev-compare-group')"
+            @click="compareStore.prevCompareGroup()"
           >
             上一组
           </el-button>
           <el-button
             v-else
             size="small"
-            :disabled="comparePage === 0"
-            @click="emit('update:comparePage', comparePage - 1)"
+            :disabled="compareStore.comparePage === 0"
+            @click="compareStore.comparePage = compareStore.comparePage - 1"
           >
             上一页
           </el-button>
-          <span class="compare-page-info">{{ comparePage + 1 }} / {{ maxComparePage }}</span>
+          <span class="compare-page-info">{{ compareStore.comparePage + 1 }} / {{ compareStore.maxComparePage }}</span>
           <el-button
-            v-if="isCompareLastPage && hasMoreCompareTrees"
+            v-if="compareStore.isCompareLastPage && compareStore.hasMoreCompareTrees"
             type="primary"
             size="small"
-            @click="emit('next-compare-group')"
+            @click="compareStore.nextCompareGroup()"
           >
             下一组
           </el-button>
           <el-button
             v-else
             size="small"
-            :disabled="comparePage >= maxComparePage - 1"
-            @click="emit('update:comparePage', comparePage + 1)"
+            :disabled="compareStore.comparePage >= compareStore.maxComparePage - 1"
+            @click="compareStore.comparePage = compareStore.comparePage + 1"
           >
             下一页
           </el-button>
@@ -433,8 +398,7 @@ const gridClass = computed(() => `compare-grid--${props.gridMode}`)
     <ContextMenu ref="contextMenuRef" :items="contextMenuItems" />
   </el-dialog>
 </template>
-
-<style scoped>
+<style>
 .el-dialog__body {
   padding: 0 !important;
   display: flex;
@@ -442,6 +406,9 @@ const gridClass = computed(() => `compare-grid--${props.gridMode}`)
   height: calc(100% - 44px);
   overflow: hidden;
 }
+</style>
+<style scoped>
+
 
 .tree-name-bar {
   display: flex;
@@ -550,7 +517,6 @@ const gridClass = computed(() => `compare-grid--${props.gridMode}`)
 
 .compare-cell {
   position: relative;
-  overflow: hidden;
   background: #fff;
   min-height: 0;
 }
@@ -617,7 +583,6 @@ const gridClass = computed(() => `compare-grid--${props.gridMode}`)
   align-items: center;
   gap: 16px;
   padding: 10px 16px;
-  background: linear-gradient(transparent, rgba(0, 0, 0, 0.45));
   z-index: 10;
 }
 
@@ -706,8 +671,9 @@ const gridClass = computed(() => `compare-grid--${props.gridMode}`)
 
 .score-badge--2 {
   position: absolute;
-  top: 6px;
-  left: 6px;
+  top: 50%;
+  transform: translateX(-50%);
+  left: 0;
   background: rgba(0, 0, 0, 0.5);
   color: #ddd;
   padding: 2px 6px;

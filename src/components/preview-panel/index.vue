@@ -46,12 +46,12 @@
 
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
+import { storeToRefs } from 'pinia'
 import type { Node } from '@/types'
+import { useTreeStore } from '@/stores/treeStore'
 
-const props = defineProps<{
-  selectedNode: Node | null
-  allNodes: Node[]
-}>()
+const treeStore = useTreeStore()
+const { selectedNode, nodes } = storeToRefs(treeStore)
 
 const emit = defineEmits<{
   updateParent: [nodeId: string, newParentId: string]
@@ -60,12 +60,11 @@ const emit = defineEmits<{
 const selectedParentId = ref<string>('')
 
 const availableNodes = computed(() => {
-  if (!props.selectedNode) return []
-  // 只能选择根节点（parentId为空），不能选自己
-  return props.allNodes.filter(node => !node.parentId && node.id !== props.selectedNode.id)
+  if (!selectedNode.value) return []
+  return nodes.value.filter(node => !node.parentId && node.id !== selectedNode.value!.id)
 })
 
-watch(() => props.selectedNode, (node) => {
+watch(selectedNode, (node) => {
   if (node) {
     selectedParentId.value = node.parentId
   } else {
@@ -74,8 +73,8 @@ watch(() => props.selectedNode, (node) => {
 }, { immediate: true })
 
 const handleSubmit = () => {
-  if (!props.selectedNode || !selectedParentId.value) return
-  emit('updateParent', props.selectedNode.id, selectedParentId.value)
+  if (!selectedNode.value || !selectedParentId.value) return
+  emit('updateParent', selectedNode.value.id, selectedParentId.value)
 }
 </script>
 

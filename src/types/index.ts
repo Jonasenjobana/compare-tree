@@ -21,7 +21,10 @@ export interface TreeRoot {
   tree?: TreeNode
   treeName: string
   maxMatchDate: string
+  totalChildCount: number
+  completedCount: string
   nodeCount: number
+  isCompleted: boolean
 }
 
 export interface TreeResponse {
@@ -46,6 +49,7 @@ export interface Node {
   rootId: string
   isModified?: boolean
   reviewResult?: string
+  intelligentRecommend?: string
 }
 
 export interface LinkData {
@@ -54,6 +58,7 @@ export interface LinkData {
   score: number
   isModified: boolean
   reviewResult?: string
+  intelligentRecommend?: string
 }
 
 export interface SearchHistoryItem {

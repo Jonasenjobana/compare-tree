@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx skills *)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(curl -sL \"https://raw.githubusercontent.com/vercel-labs/web-interface-guidelines/main/command.md\")",
+      "Bash(curl -sL --connect-timeout 10 \"https://raw.githubusercontent.com/vercel-labs/web-interface-guidelines/main/command.md\")",
+      "Bash(npx vue-tsc *、)",
+      "Bash(npx vue-tsc *)"
+    ]
+  }
+}
